@@ -1,0 +1,43 @@
+package output
+
+// Error codes for doctor command (E1xx).
+const (
+	CodeDockerNotInstalled  = "E101"
+	CodeDockerNotRunning    = "E102"
+	CodeComposeNotAvailable = "E103"
+	CodePortInUse           = "E104"
+	CodePythonNotFound      = "E105"
+	CodeInsufficientDisk    = "E106"
+)
+
+// Error codes for setup command (E2xx).
+const (
+	CodeNoPythonProject    = "E201"
+	CodeNoEntryPoint       = "E202"
+	CodeAgentfileExists    = "E203"
+	CodeSetupReserved4     = "E204"
+	CodeSetupReserved5     = "E205"
+	CodeSetupReserved6     = "E206"
+)
+
+// Error codes for deploy command (E3xx).
+const (
+	CodeDeployDockerNotRunning = "E301"
+	CodeBuildFailed            = "E302"
+	CodeHealthCheckFailed      = "E303"
+	CodeOOMKilled              = "E304"
+	CodeEnvNotFound            = "E305"
+	CodeDeployReserved6        = "E306"
+)
+
+// Error codes for status command (E4xx).
+const (
+	CodeNoDeployment         = "E401"
+	CodeStatusDockerNotRunning = "E402"
+)
+
+// Error codes for shared/agentfile (E5xx).
+const (
+	CodeInvalidAgentfile       = "E501"
+	CodeUnsupportedVersion     = "E502"
+)

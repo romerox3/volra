@@ -1,0 +1,7 @@
+[project]
+name = "my-agent"
+version = "0.1.0"
+dependencies = [
+    "langgraph>=0.1.0",
+    "fastapi>=0.100.0",
+]

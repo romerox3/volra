@@ -1,0 +1,6 @@
+version: 1
+name: my-agent
+framework: invalid
+port: 8000
+health_path: /health
+dockerfile: auto

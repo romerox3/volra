@@ -1,0 +1,6 @@
+version: 2
+name: my-agent
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto
