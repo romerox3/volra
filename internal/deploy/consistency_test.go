@@ -23,6 +23,7 @@ func TestEmbeddedTemplates_Exist(t *testing.T) {
 func TestEmbeddedStatic_Exist(t *testing.T) {
 	statics := []string{
 		"static/alert_rules.yml",
+		"static/blackbox.yml",
 		"static/datasource.yml",
 		"static/dashboards.yml",
 		"static/overview.json",

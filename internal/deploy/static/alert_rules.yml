@@ -3,10 +3,10 @@ groups:
   - name: volra-agent
     rules:
       - alert: AgentDown
-        expr: up{job="agent-health"} == 0
+        expr: probe_success{job="agent-health"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
           summary: "Agent is down"
-          description: "Agent health check has been failing for more than 1 minute."
+          description: "Agent health probe has been failing for more than 1 minute."

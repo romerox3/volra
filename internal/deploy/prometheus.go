@@ -59,3 +59,19 @@ func CopyAlertRules(dir string) error {
 	outputPath := filepath.Join(outputDir, "alert_rules.yml")
 	return os.WriteFile(outputPath, data, 0644)
 }
+
+// CopyBlackboxConfig copies the static blackbox.yml to the output directory.
+func CopyBlackboxConfig(dir string) error {
+	data, err := staticFS.ReadFile("static/blackbox.yml")
+	if err != nil {
+		return fmt.Errorf("reading blackbox config: %w", err)
+	}
+
+	outputDir := filepath.Join(dir, OutputDir)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("creating output directory: %w", err)
+	}
+
+	outputPath := filepath.Join(outputDir, "blackbox.yml")
+	return os.WriteFile(outputPath, data, 0644)
+}

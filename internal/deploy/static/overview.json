@@ -52,7 +52,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "up{job=\"agent-health\"}",
+          "expr": "probe_success{job=\"agent-health\"}",
           "legendFormat": "Health Probe",
           "refId": "A"
         }
@@ -91,7 +91,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "avg_over_time(up{job=\"agent-health\"}[24h])",
+          "expr": "avg_over_time(probe_success{job=\"agent-health\"}[24h])",
           "legendFormat": "Uptime",
           "refId": "A"
         }
@@ -130,7 +130,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "scrape_duration_seconds{job=\"agent-health\"}",
+          "expr": "probe_duration_seconds{job=\"agent-health\"}",
           "legendFormat": "Latency",
           "refId": "A"
         }

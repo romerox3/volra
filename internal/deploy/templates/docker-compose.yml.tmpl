@@ -21,6 +21,17 @@ services:
     networks:
       - volra
 
+  blackbox:
+    image: quay.io/prometheus/blackbox-exporter:v0.25.0
+    container_name: {{.Name}}-blackbox
+    restart: unless-stopped
+    volumes:
+      - ./blackbox.yml:/config/blackbox.yml:ro
+    command:
+      - '--config.file=/config/blackbox.yml'
+    networks:
+      - volra
+
   prometheus:
     image: prom/prometheus:v3.1.0
     container_name: {{.Name}}-prometheus
@@ -35,6 +46,8 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=7d'
       - '--storage.tsdb.retention.size=500MB'
+    depends_on:
+      - blackbox
     networks:
       - volra
 

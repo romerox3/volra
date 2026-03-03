@@ -100,8 +100,9 @@ func TestRenderPrometheus_HealthJobTarget(t *testing.T) {
 	}
 	got, err := RenderPrometheus(tc)
 	require.NoError(t, err)
-	assert.Contains(t, got, "metrics_path: /healthz")
-	assert.Contains(t, got, "agent:3000")
+	assert.Contains(t, got, "http://agent:3000/healthz")
+	assert.Contains(t, got, "metrics_path: /probe")
+	assert.Contains(t, got, "blackbox:9115")
 }
 
 func TestRenderPrometheus_MetricsJobTarget(t *testing.T) {
@@ -147,7 +148,7 @@ func TestCopyAlertRules_WritesFile(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(dir, OutputDir, "alert_rules.yml"))
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "AgentDown")
-	assert.Contains(t, string(content), `up{job="agent-health"} == 0`)
+	assert.Contains(t, string(content), `probe_success{job="agent-health"} == 0`)
 	assert.Contains(t, string(content), "for: 1m")
 }
 
@@ -170,4 +171,15 @@ func TestCopyAlertRules_StaticContent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "severity: critical")
 	assert.Contains(t, string(content), "volra-agent")
+}
+
+func TestCopyBlackboxConfig_WritesFile(t *testing.T) {
+	dir := t.TempDir()
+	err := CopyBlackboxConfig(dir)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(dir, OutputDir, "blackbox.yml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "http_2xx")
+	assert.Contains(t, string(content), "prober: http")
 }

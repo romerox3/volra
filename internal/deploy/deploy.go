@@ -54,6 +54,9 @@ func Run(ctx context.Context, dir string, p output.Presenter, dr docker.DockerRu
 	if err := CopyAlertRules(dir); err != nil {
 		return fmt.Errorf("copying alert_rules.yml: %w", err)
 	}
+	if err := CopyBlackboxConfig(dir); err != nil {
+		return fmt.Errorf("copying blackbox.yml: %w", err)
+	}
 	if err := CopyGrafanaAssets(dir); err != nil {
 		return fmt.Errorf("copying Grafana assets: %w", err)
 	}
