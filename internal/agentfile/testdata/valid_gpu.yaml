@@ -1,0 +1,7 @@
+version: 1
+name: gpu-agent
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto
+gpu: true

@@ -1,0 +1,19 @@
+version: 1
+name: my-agent
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto
+services:
+  svc-a:
+    image: redis:7
+  svc-b:
+    image: redis:7
+  svc-c:
+    image: redis:7
+  svc-d:
+    image: redis:7
+  svc-e:
+    image: redis:7
+  svc-f:
+    image: redis:7

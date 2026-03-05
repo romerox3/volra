@@ -9,9 +9,10 @@ services:
     container_name: my-agent-agent
     restart: unless-stopped
     ports:
-      - "9000:9000"
-    env_file:
-      - ./agent.env
+      - "8000:8000"
+    volumes:
+      - my-agent-data:/data
+      - my-agent-models:/models
     networks:
       - volra
   blackbox:
@@ -63,6 +64,8 @@ services:
 
 volumes:
   prometheus-data:
+  my-agent-data:
+  my-agent-models:
 
 networks:
   volra:

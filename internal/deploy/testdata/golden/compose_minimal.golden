@@ -12,7 +12,6 @@ services:
       - "8000:8000"
     networks:
       - volra
-
   blackbox:
     image: quay.io/prometheus/blackbox-exporter:v0.25.0
     container_name: my-agent-blackbox

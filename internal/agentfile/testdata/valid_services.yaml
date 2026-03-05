@@ -1,0 +1,16 @@
+version: 1
+name: my-agent
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto
+services:
+  redis:
+    image: redis:7-alpine
+  db:
+    image: postgres:16
+    port: 5432
+    volumes:
+      - /var/lib/postgresql/data
+    env:
+      - POSTGRES_PASSWORD

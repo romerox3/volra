@@ -1,0 +1,11 @@
+version: 1
+name: secure-agent
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto
+security:
+  read_only: true
+  no_new_privileges: true
+  drop_capabilities:
+    - ALL

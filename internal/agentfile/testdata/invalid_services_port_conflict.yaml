@@ -1,0 +1,11 @@
+version: 1
+name: my-agent
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto
+services:
+  redis:
+    image: redis:7
+    port: 6379
+    host_port: 8000

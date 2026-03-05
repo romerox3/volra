@@ -9,9 +9,32 @@ services:
     container_name: my-agent-agent
     restart: unless-stopped
     ports:
-      - "9000:9000"
+      - "8000:8000"
+    depends_on:
+      my-agent-db:
+        condition: service_started
+      my-agent-redis:
+        condition: service_started
+    networks:
+      - volra
+
+  my-agent-db:
+    image: postgres:16
+    container_name: my-agent-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
     env_file:
-      - ./agent.env
+      - ./my-agent-db.env
+    volumes:
+      - my-agent-db-var-lib-postgresql-data:/var/lib/postgresql/data
+    networks:
+      - volra
+
+  my-agent-redis:
+    image: redis:7-alpine
+    container_name: my-agent-redis
+    restart: unless-stopped
     networks:
       - volra
   blackbox:
@@ -63,6 +86,7 @@ services:
 
 volumes:
   prometheus-data:
+  my-agent-db-var-lib-postgresql-data:
 
 networks:
   volra:

@@ -1,0 +1,8 @@
+version: 1
+name: partial-security
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto
+security:
+  read_only: true

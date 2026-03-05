@@ -1,0 +1,7 @@
+version: 1
+name: my-agent
+framework: generic
+port: 8000
+health_path: /health
+package_manager: poetry
+dockerfile: auto

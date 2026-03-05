@@ -1,0 +1,9 @@
+version: 1
+name: obs-agent
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto
+observability:
+  level: 2
+  metrics_port: 9101
