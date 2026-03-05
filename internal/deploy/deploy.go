@@ -39,7 +39,7 @@ func Run(ctx context.Context, dir string, p output.Presenter, dr docker.DockerRu
 		if _, err := os.Stat(envPath); os.IsNotExist(err) {
 			return &output.UserError{
 				Code: output.CodeEnvNotFound,
-				What: fmt.Sprintf("Agentfile declares env vars but .env file not found"),
+				What: "Agentfile declares env vars but .env file not found",
 				Fix:  "Create .env from .env.example: cp .env.example .env",
 			}
 		}

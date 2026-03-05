@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -35,7 +36,7 @@ func runMCP(t *testing.T, lines ...string) []Response {
 	in := strings.NewReader(input)
 	var out bytes.Buffer
 
-	err := Serve(nil, in, &out, "0.0.0-test")
+	err := Serve(context.TODO(), in, &out, "0.0.0-test")
 	require.NoError(t, err)
 
 	var responses []Response
@@ -141,7 +142,7 @@ func TestServe_ParseError(t *testing.T) {
 	in := strings.NewReader("this is not json\n")
 	var out bytes.Buffer
 
-	err := Serve(nil, in, &out, "0.0.0-test")
+	err := Serve(context.TODO(), in, &out, "0.0.0-test")
 	require.NoError(t, err) // server should not crash
 
 	var resp Response
@@ -157,7 +158,7 @@ func TestServe_EmptyLines(t *testing.T) {
 	in := strings.NewReader(input)
 	var out bytes.Buffer
 
-	err := Serve(nil, in, &out, "0.0.0-test")
+	err := Serve(context.TODO(), in, &out, "0.0.0-test")
 	require.NoError(t, err)
 
 	var resp Response
@@ -211,7 +212,7 @@ func TestServe_ToolsCall_InvalidParams(t *testing.T) {
 	in := strings.NewReader(raw + "\n")
 	var out bytes.Buffer
 
-	err := Serve(nil, in, &out, "0.0.0-test")
+	err := Serve(context.TODO(), in, &out, "0.0.0-test")
 	require.NoError(t, err)
 
 	var resp Response
