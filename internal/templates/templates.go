@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 //go:embed basic rag conversational langgraph crewai openai-agents api-agent smolagents mcp-server discord-bot slack-bot web-chat
@@ -26,11 +28,43 @@ type Template struct {
 	Name        string
 	Description string
 	Category    string
+	Framework   string
+	Services    []string
+}
+
+// templateMeta is a minimal struct for parsing Agentfile metadata.
+type templateMeta struct {
+	Framework string                 `yaml:"framework"`
+	Services  map[string]interface{} `yaml:"services"`
+}
+
+// loadMeta reads the embedded Agentfile for a template and extracts framework + service keys.
+func loadMeta(templateName string) (framework string, services []string) {
+	data, err := fs.ReadFile(content, filepath.Join(templateName, "Agentfile"))
+	if err != nil {
+		return "generic", nil
+	}
+
+	var meta templateMeta
+	if err := yaml.Unmarshal(data, &meta); err != nil {
+		return "generic", nil
+	}
+
+	framework = meta.Framework
+	if framework == "" {
+		framework = "generic"
+	}
+
+	for k := range meta.Services {
+		services = append(services, k)
+	}
+
+	return framework, services
 }
 
 // Available returns the list of available templates.
 func Available() []Template {
-	return []Template{
+	templates := []Template{
 		// Getting Started
 		{Name: "basic", Description: "Minimal FastAPI agent with health + ask endpoints", Category: CategoryGettingStarted},
 
@@ -51,6 +85,12 @@ func Available() []Template {
 		{Name: "slack-bot", Description: "AI-powered Slack bot with event handling", Category: CategoryPlatform},
 		{Name: "web-chat", Description: "Full-stack chat UI with WebSocket", Category: CategoryPlatform},
 	}
+
+	for i := range templates {
+		templates[i].Framework, templates[i].Services = loadMeta(templates[i].Name)
+	}
+
+	return templates
 }
 
 // Scaffold copies a template to the target directory, replacing {{.Name}} placeholders.

@@ -75,3 +75,54 @@ func TestUnknownTemplateReturnsError(t *testing.T) {
 		t.Error("expected error for unknown template, got nil")
 	}
 }
+
+func TestTemplateMetadata(t *testing.T) {
+	for _, tmpl := range Available() {
+		t.Run(tmpl.Name, func(t *testing.T) {
+			if tmpl.Framework == "" {
+				t.Error("Framework must not be empty")
+			}
+		})
+	}
+}
+
+func TestTemplateServicesCount(t *testing.T) {
+	expected := map[string]int{
+		"basic":          0,
+		"rag":            2, // cache + vectordb
+		"conversational": 2, // redis + postgres
+		"api-agent":      0,
+		"mcp-server":     0,
+		"langgraph":      0,
+		"crewai":         0,
+		"openai-agents":  0,
+		"smolagents":     0,
+		"discord-bot":    1, // cache
+		"slack-bot":      0,
+		"web-chat":       0,
+	}
+
+	for _, tmpl := range Available() {
+		t.Run(tmpl.Name, func(t *testing.T) {
+			want, ok := expected[tmpl.Name]
+			if !ok {
+				t.Skipf("no expected count for %s", tmpl.Name)
+			}
+			if got := len(tmpl.Services); got != want {
+				t.Errorf("services count = %d, want %d (services: %v)", got, want, tmpl.Services)
+			}
+		})
+	}
+}
+
+func TestTemplateLangGraphFramework(t *testing.T) {
+	for _, tmpl := range Available() {
+		if tmpl.Name == "langgraph" {
+			if tmpl.Framework != "langgraph" {
+				t.Errorf("langgraph template framework = %q, want %q", tmpl.Framework, "langgraph")
+			}
+			return
+		}
+	}
+	t.Error("langgraph template not found")
+}

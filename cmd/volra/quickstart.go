@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/romerox3/volra/internal/output"
 	"github.com/romerox3/volra/internal/templates"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -42,12 +44,74 @@ func runQuickstart(cmd *cobra.Command, args []string) error {
 }
 
 func runQuickstartInteractive() error {
-	// Check if stdin is a terminal for interactive mode.
+	// Non-interactive: pipe or redirection — just list templates.
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		// Non-interactive: just list templates.
 		return listTemplates()
 	}
 
+	// --json flag: structured output.
+	if jsonOutput {
+		return listTemplatesJSON()
+	}
+
+	// Degraded terminal: numbered list fallback.
+	if output.DetectMode() != output.ModeColor {
+		return runQuickstartSimple()
+	}
+
+	// Full TUI.
+	return runQuickstartTUI()
+}
+
+// listTemplates prints templates as plain text (non-interactive).
+func listTemplates() error {
+	fmt.Println("Available templates:")
+	currentCategory := ""
+	for _, t := range templates.Available() {
+		if t.Category != currentCategory {
+			currentCategory = t.Category
+			fmt.Printf("\n  %s:\n", currentCategory)
+		}
+		fmt.Printf("    %-20s %s\n", t.Name, t.Description)
+	}
+	fmt.Println()
+	fmt.Println("Usage: volra quickstart <template> <directory>")
+	return nil
+}
+
+// listTemplatesJSON outputs templates as a JSON array.
+func listTemplatesJSON() error {
+	type jsonTemplate struct {
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		Category    string   `json:"category"`
+		Framework   string   `json:"framework"`
+		Services    []string `json:"services"`
+	}
+
+	available := templates.Available()
+	out := make([]jsonTemplate, len(available))
+	for i, t := range available {
+		svcs := t.Services
+		if svcs == nil {
+			svcs = []string{}
+		}
+		out[i] = jsonTemplate{
+			Name:        t.Name,
+			Description: t.Description,
+			Category:    t.Category,
+			Framework:   t.Framework,
+			Services:    svcs,
+		}
+	}
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(out)
+}
+
+// runQuickstartSimple is the numbered-list fallback for non-color terminals.
+func runQuickstartSimple() error {
 	available := templates.Available()
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -85,21 +149,6 @@ func runQuickstartInteractive() error {
 
 	fmt.Println()
 	return scaffold(templateName, projectName)
-}
-
-func listTemplates() error {
-	fmt.Println("Available templates:")
-	currentCategory := ""
-	for _, t := range templates.Available() {
-		if t.Category != currentCategory {
-			currentCategory = t.Category
-			fmt.Printf("\n  %s:\n", currentCategory)
-		}
-		fmt.Printf("    %-20s %s\n", t.Name, t.Description)
-	}
-	fmt.Println()
-	fmt.Println("Usage: volra quickstart <template> <directory>")
-	return nil
 }
 
 func scaffold(templateName, targetDir string) error {
