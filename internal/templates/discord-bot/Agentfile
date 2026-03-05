@@ -3,21 +3,13 @@ name: {{.Name}}
 framework: generic
 port: 8000
 health_path: /health
-health_timeout: 120
 dockerfile: auto
 env:
+  - DISCORD_TOKEN
   - OPENAI_API_KEY
   - OPENAI_BASE_URL
   - OPENAI_MODEL
 services:
-  redis:
+  cache:
     image: redis:7-alpine
     port: 6379
-  postgres:
-    image: postgres:16-alpine
-    port: 5432
-    volumes:
-      - /var/lib/postgresql/data
-    env:
-      - POSTGRES_PASSWORD
-      - POSTGRES_DB

@@ -1,6 +1,6 @@
 version: 1
 name: {{.Name}}
-framework: generic
+framework: langgraph
 port: 8000
 health_path: /health
 health_timeout: 120
@@ -9,10 +9,5 @@ env:
   - OPENAI_API_KEY
   - OPENAI_BASE_URL
   - OPENAI_MODEL
-services:
-  cache:
-    image: redis:7-alpine
-    port: 6379
-  vectordb:
-    image: chromadb/chroma:0.6.3
-    port: 8000
+observability:
+  level: 2

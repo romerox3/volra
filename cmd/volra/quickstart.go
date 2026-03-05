@@ -53,9 +53,13 @@ func runQuickstartInteractive() error {
 
 	// Step 1: Choose template
 	fmt.Println("Choose a template:")
-	fmt.Println()
+	currentCategory := ""
 	for i, t := range available {
-		fmt.Printf("  %d) %-20s %s\n", i+1, t.Name, t.Description)
+		if t.Category != currentCategory {
+			currentCategory = t.Category
+			fmt.Printf("\n  %s:\n", currentCategory)
+		}
+		fmt.Printf("  %2d) %-20s %s\n", i+1, t.Name, t.Description)
 	}
 	fmt.Println()
 	fmt.Printf("Enter number (1-%d): ", len(available))
@@ -85,9 +89,13 @@ func runQuickstartInteractive() error {
 
 func listTemplates() error {
 	fmt.Println("Available templates:")
-	fmt.Println()
+	currentCategory := ""
 	for _, t := range templates.Available() {
-		fmt.Printf("  %-20s %s\n", t.Name, t.Description)
+		if t.Category != currentCategory {
+			currentCategory = t.Category
+			fmt.Printf("\n  %s:\n", currentCategory)
+		}
+		fmt.Printf("    %-20s %s\n", t.Name, t.Description)
 	}
 	fmt.Println()
 	fmt.Println("Usage: volra quickstart <template> <directory>")
