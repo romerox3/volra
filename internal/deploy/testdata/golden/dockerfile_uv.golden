@@ -3,9 +3,10 @@
 FROM python:3.12-slim AS builder
 
 WORKDIR /build
-COPY . .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --prefix=/install .
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY pyproject.toml uv.lock* ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system --prefix=/install -r pyproject.toml
 
 # Stage 2: Runtime
 FROM python:3.12-slim
@@ -15,6 +16,6 @@ COPY --from=builder /install /usr/local
 
 COPY . .
 
-EXPOSE 9000
+EXPOSE 8000
 
-CMD ["python", "app.py"]
+CMD ["python", "main.py"]

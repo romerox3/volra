@@ -1,0 +1,5 @@
+{
+    "_meta": {"hash": {"sha256": "abc123"}},
+    "default": {"flask": {"version": "==3.0.0"}},
+    "develop": {}
+}

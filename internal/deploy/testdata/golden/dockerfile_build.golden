@@ -6,12 +6,17 @@ WORKDIR /build
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --prefix=/install -r requirements.txt
+ENV PYTHONPATH=/install/lib/python3.11/site-packages
+RUN python -m nltk.downloader punkt
+RUN python -c "import transformers; transformers.AutoTokenizer.from_pretrained('bert-base-uncased')"
 
 # Stage 2: Runtime
 FROM python:3.11-slim
 
 WORKDIR /app
 COPY --from=builder /install /usr/local
+COPY --from=builder /root/nltk_data /root/nltk_data
+COPY --from=builder /root/.cache/huggingface /root/.cache/huggingface
 
 COPY . .
 

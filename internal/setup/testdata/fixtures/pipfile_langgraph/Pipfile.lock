@@ -1,0 +1,5 @@
+{
+    "_meta": {"hash": {"sha256": "abc123"}},
+    "default": {"langgraph": {"version": "==0.1.0"}},
+    "develop": {}
+}
