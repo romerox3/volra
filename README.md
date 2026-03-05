@@ -54,8 +54,8 @@ curl -fsSL https://raw.githubusercontent.com/romerox3/volra/main/install.sh | sh
 <summary>Other install methods</summary>
 
 ```bash
-# Homebrew (coming soon)
-brew install romerox3/tap/volra
+# Homebrew
+brew install romerox3/volra/volra
 
 # From source
 git clone https://github.com/romerox3/volra.git
