@@ -1,0 +1,6 @@
+version: 1
+name: {{.Name}}
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto

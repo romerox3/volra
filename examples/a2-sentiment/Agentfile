@@ -1,0 +1,9 @@
+version: 1
+name: sentiment-analyzer
+framework: generic
+port: 8000
+health_path: /health
+health_timeout: 90
+dockerfile: auto
+env:
+  - MODEL_NAME

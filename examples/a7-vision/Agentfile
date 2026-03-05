@@ -1,0 +1,10 @@
+version: 1
+name: vision-classifier
+framework: generic
+port: 8000
+health_path: /health
+health_timeout: 300
+dockerfile: custom
+gpu: true
+volumes:
+  - /models

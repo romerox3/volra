@@ -1,0 +1,10 @@
+version: 1
+name: doc-summarizer
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto
+volumes:
+  - /data/cache
+env:
+  - OPENAI_API_KEY

@@ -1,0 +1,21 @@
+version: 1
+name: {{.Name}}
+framework: langgraph
+port: 8000
+health_path: /health
+health_timeout: 120
+dockerfile: auto
+env:
+  - OPENAI_API_KEY
+services:
+  redis:
+    image: redis:7-alpine
+    port: 6379
+  postgres:
+    image: postgres:16-alpine
+    port: 5432
+    volumes:
+      - /var/lib/postgresql/data
+    env:
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB

@@ -1,0 +1,10 @@
+version: 1
+name: {{.Name}}
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto
+services:
+  cache:
+    image: redis:7-alpine
+    port: 6379
