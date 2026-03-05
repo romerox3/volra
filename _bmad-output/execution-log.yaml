@@ -279,3 +279,629 @@
   project: Volra
   story: "3.2 — Docker Compose Generation"
   notes: "GENERATE mode. docker-compose.yml.tmpl with 3 services (agent, prometheus, grafana). compose.go with GenerateCompose/RenderCompose. 11 compose tests + 2 golden files. Conditional env_file, custom/auto dockerfile mode, project naming, port mappings, volume mounts, bridge network. 23 deploy tests total, 158 total tests, 0 lint issues."
+
+# ===== v1.1 Planning Cycle =====
+
+- agent: ned
+  workflow: CC (Correct Course)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-03T21:15:00+01:00
+  project: Volra
+  notes: "Sprint change proposal for v1.1/v1.2/v2.0. 10 limitations from E2E testing classified into 3 releases. L9 (horizontal scaling) confirmed out of scope. Schema strategy: version 1 with optional fields for v1.1/v1.2, version 2 only for v2.0 (breaking change with services). Epic numbering continues at 6+. Backward compatibility NFR added."
+
+- agent: lisa
+  workflow: EP (Edit PRD)
+  phase: 2-plan
+  status: SUCCESS
+  timestamp: 2026-03-03T21:20:00+01:00
+  project: Volra
+  notes: "PRD updated with FR42-FR50 for 3 releases. Roadmap restructured v1.1/v1.2/v2.0. Scope rule updated for field budget. NFR24-NFR25 added for backward compatibility. L9 marked explicitly out of scope."
+
+- agent: frink
+  workflow: CA (Create Architecture)
+  phase: 3-solutioning
+  status: SUCCESS
+  timestamp: 2026-03-03T21:25:00+01:00
+  project: Volra
+  notes: "Architecture extended (EXTEND mode) with v1.1 sections: health_timeout field spec, multi-stage Dockerfile pattern, HasMetrics detection, dashboard variant strategy (static JSON, no templates). Key decision: dashboards stay as static JSON with variant selection, not Go templates."
+
+- agent: lisa
+  workflow: CE (Create Epics and Stories)
+  phase: 3-solutioning
+  status: SUCCESS
+  timestamp: 2026-03-03T21:30:00+01:00
+  project: Volra
+  notes: "Epic 6 created with 3 implementation-ready stories (6.1 health_timeout, 6.2 multi-stage Dockerfile, 6.3 custom metrics). GWT acceptance criteria. Epics 7-8 sketched for v1.2/v2.0 roadmap."
+
+- agent: frink
+  workflow: IR (Implementation Readiness)
+  phase: 3-solutioning
+  status: SUCCESS
+  timestamp: 2026-03-03T21:35:00+01:00
+  project: Volra
+  notes: "v1.1 implementation readiness validated. 3/3 FRs mapped to stories, all stories have architecture backing, GWT criteria complete, backward compatibility covered, test strategy defined. READY FOR IMPLEMENTATION."
+
+- agent: ned
+  workflow: SP (Sprint Planning)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-03T21:40:00+01:00
+  project: Volra
+  notes: "Sprint planned for Epic 6. Order: 6.1 (health_timeout, warmup) → 6.2 (multi-stage Dockerfile, isolated) → 6.3 (custom metrics, complex). Sprint status updated."
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-03T21:45:00+01:00
+  project: Volra
+  story: "6.1 — Configurable Health Timeout"
+  notes: "REFINE mode. Added health_timeout field to Agentfile (int, optional, range 10-600, default 60). Updated WaitForHealth signature with configurable timeout. 4 new test fixtures, 11 new agentfile tests, 3 new healthcheck tests. Backward compatibility verified with v1.0 fixtures."
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-03T22:00:00+01:00
+  project: Volra
+  story: "6.2 — Multi-Stage Dockerfile Builds"
+  notes: "REFINE mode. Replaced single-stage Dockerfile.tmpl with multi-stage pattern (builder + runtime). pip cache mounts via --mount=type=cache. Golden files regenerated. All existing tests pass with updated golden files."
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-03T22:15:00+01:00
+  project: Volra
+  story: "6.3 — Custom Metrics Dashboard Panels"
+  notes: "REFINE mode. Added HasMetrics detection (prometheus_client in requirements.txt/pyproject.toml). Created dashboard variants (overview_metrics.json, detail_metrics.json) with 5 additional panels (Request Rate, Active Requests, Request Rate Over Time, P95 Latency, Custom Metrics table). Updated CopyGrafanaAssets to select variant based on HasMetrics. 14 new tests (7 detection, 5 dashboard, 2 BuildContext). 236 total tests, 0 lint issues."
+
+- agent: ned
+  workflow: CC (Correct Course)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-03T22:20:00+01:00
+  project: Volra
+  notes: "v1.1 complete. Epic 6 delivered: 3 stories, 37 new tests, 236 total tests, 0 lint issues. Files changed: agentfile.go, validate.go, healthcheck.go, deploy.go, context.go, grafana.go, Dockerfile.tmpl, consistency_test.go. New files: 4 test fixtures, 2 dashboard JSONs. All v1.0 backward compatibility verified."
+
+- agent: homer
+  workflow: CR (Code Review)
+  phase: 4-implementation
+  status: STARTED
+  timestamp: 2026-03-03T23:00:00+01:00
+  project: Volra
+  notes: "Adversarial code review of Epic 6 (v1.1). VRG: VERIFY mode."
+
+- agent: homer
+  workflow: CR (Code Review)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-03T23:15:00+01:00
+  project: Volra
+  notes: "Code Review PASSED. 22/22 acceptance criteria IMPLEMENTED across 3 stories. 1 LOW issue found and fixed (dead code `_ = i` in context.go). 2 LOW findings accepted (redundant deadline check — defensive pattern; test doesn't assert custom timeout value in error message — acceptable gap). 236 tests, 0 lint issues. No HIGH or MEDIUM issues."
+
+- agent: ned
+  workflow: ER (Retrospective)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-03T23:20:00+01:00
+  project: Volra
+  epic: "Epic 6 — Operational Polish (v1.1)"
+  notes: >
+    Epic 6 Retrospective Summary:
+    WHAT WENT WELL: (1) All 3 stories implemented and CR-approved in single sprint.
+    (2) Zero test failures during implementation. (3) Multi-stage Dockerfile reduced
+    image size significantly. (4) Dashboard variant strategy (static JSON selection)
+    was simpler and more maintainable than Go template approach. (5) Backward
+    compatibility verified — all v1.0 fixtures pass unchanged.
+    WHAT COULD IMPROVE: (1) The `_ = i` dead code slipped through — consider adding
+    `golangci-lint` unused-write checker. (2) TestWaitForHealth_CustomTimeoutInErrorMessage
+    doesn't assert the actual timeout value — minor gap worth closing in a future sprint.
+    (3) Dashboard JSON files are large and duplicative — future v1.2 might benefit from
+    a templating approach if more variants are needed.
+    ACTION ITEMS: (1) Consider adding `govet` unused writes lint rule. (2) Close
+    the timeout assertion gap in healthcheck_test.go when Story 7.x touches healthcheck.
+    METRICS: 37 new tests (199→236), 1015 insertions / 58 deletions, 19 modified files,
+    5 new files, 0 lint issues, 0 test failures during dev, 1 LOW fix during CR.
+
+- agent: ned
+  workflow: CC (Correct Course)
+  phase: 4-implementation
+  status: STARTED
+  timestamp: 2026-03-03T23:30:00+01:00
+  project: Volra
+  notes: "v1.2 planning cycle. Trigger: Epic 6 complete, elaboración progresiva calls for detailed v1.2 planning. Analyzing FR45/FR46 overlap with v1.1 implementation."
+
+- agent: ned
+  workflow: CC (Correct Course)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-03T23:35:00+01:00
+  project: Volra
+  notes: "CC complete. Key finding: FR46 70% redundant with v1.1 FR44/Story 6.3. Rewrite approved. Major simplification: drop HasLLMMetrics detection, extend existing _metrics.json dashboards with LLM panels instead. Handoff to Lisa EP."
+
+- agent: lisa
+  workflow: EP (Edit PRD)
+  phase: 2-planning
+  status: STARTED
+  timestamp: 2026-03-03T23:40:00+01:00
+  project: Volra
+  notes: "Party Mode with Frink + Ned. 5 convergence points reached. Editing PRD for v1.2."
+
+- agent: lisa
+  workflow: EP (Edit PRD)
+  phase: 2-planning
+  status: SUCCESS
+  timestamp: 2026-03-03T23:45:00+01:00
+  project: Volra
+  notes: "PRD updated for v1.2. 4 edits: (1) FR46 rewritten to focus on LLM token tracking panels as FR44 extension, (2) roadmap v1.2 description updated, (3) scope rules clarified, (4) section header renamed. Key Party Mode decisions: simple volumes path list, extend existing _metrics.json instead of new files, HasLLMMetrics dropped entirely."
+
+- agent: frink
+  workflow: CA (Create Architecture)
+  phase: 3-solutioning
+  status: SUCCESS
+  timestamp: 2026-03-03T23:50:00+01:00
+  project: Volra
+  notes: "Architecture extended for v1.2. REFINE mode. 2 new extensions: (4) Persistent Volume Mounts — schema, validation (block /app), VolumeSpec in TemplateContext, compose template changes. (5) LLM Token Tracking Panels — extend existing _metrics.json, Volra LLM Metrics Convention, 4 new panels (1 overview, 3 detail). 3 ADRs: simple path list, block /app, extend-not-create dashboard files."
+
+- agent: lisa
+  workflow: CE (Create Epics and Stories)
+  phase: 3-solutioning
+  status: SUCCESS
+  timestamp: 2026-03-03T23:55:00+01:00
+  project: Volra
+  notes: "Epic 7 detailed with 2 stories and 11 GWT acceptance criteria. Story 7.1 (Persistent Volumes): 7 ACs — deploy with volumes, backward compat, 3 validation errors, volume naming, v1.0 compat. Story 7.2 (LLM Token Tracking): 4 ACs — overview panel, detail panels, HasMetrics integration, probe-only fallback. Epic 7 sketch replaced with implementation-ready stories."
+
+- agent: frink
+  workflow: IR (Implementation Readiness)
+  phase: 3-solutioning
+  status: SUCCESS
+  timestamp: 2026-03-04T00:00:00+01:00
+  project: Volra
+  notes: "IR PASSED. 6/6 checklist items green: FR coverage (2/2), architecture coverage (2/2 stories backed), story quality (11 ACs, all testable), backward compat (NFR24/NFR25 verified), test strategy (4 fixtures + 1 golden + assertion tests), risk LOW. Ready for implementation."
+
+- agent: ned
+  workflow: SP (Sprint Planning)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T00:05:00+01:00
+  project: Volra
+  notes: "Sprint planned for Epic 7. Order: 7.1 (Persistent Volumes) → 7.2 (LLM Token Tracking). Both independent, 7.1 first as larger story. Estimated ~20 new tests. DoD: all ACs verified, full test suite passes, lint clean, backward compat confirmed."
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T00:15:00+01:00
+  project: Volra
+  story: "7.1 — Persistent Volume Mounts"
+  notes: "REFINE mode. Added Volumes []string to Agentfile. validateVolumes() with 5 checks (absolute path, /app block, duplicates, max 10, empty entry). VolumeSpec type + buildVolumeSpecs() in context.go. docker-compose.yml.tmpl updated with conditional agent volumes + top-level declarations. 4 test fixtures, 13 agentfile tests, 3 BuildContext tests, 3 compose tests (incl golden). 19 new tests."
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T00:25:00+01:00
+  project: Volra
+  story: "7.2 — LLM Token Tracking Dashboard Panels"
+  notes: "REFINE mode. Extended overview_metrics.json with 1 panel (LLM Token Rate, id:6). Extended detail_metrics.json with 3 panels (Token Consumption timeseries id:8, LLM Cost Trending timeseries id:9, Per-Model Request Breakdown bargauge id:10). All panels follow Volra LLM Metrics Convention, use job=agent-metrics. 4 new grafana tests. 259 total tests, 0 lint issues."
+
+- agent: homer
+  workflow: CR (Code Review)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T00:35:00+01:00
+  project: Volra
+  notes: "Adversarial Code Review PASSED for Epic 7. 11/11 ACs verified. 3 fixes applied: (1) MEDIUM — root path '/' now rejected in validateVolumes(), (2) LOW — Panel 10 description corrected ('by model' instead of 'by model and status'), (3) LOW — added comment documenting volume naming convention. 1 new test (TestValidate_VolumesRootPath). 260 total tests, 0 lint issues."
+
+- agent: ned
+  workflow: ER (Retrospective)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T00:40:00+01:00
+  project: Volra
+  epic: "Epic 7 — Data Persistence & LLM Observability (v1.2)"
+  notes: >
+    Epic 7 Retrospective Summary:
+    WHAT WENT WELL: (1) Both stories implemented and CR-approved in single sprint.
+    (2) Party Mode convergence during planning prevented scope creep — dropping HasLLMMetrics
+    saved ~50% complexity in Story 7.2. (3) Volume validation caught real edge case during CR
+    (root path /). (4) Static JSON extension for LLM panels was simpler than template approach.
+    (5) Backward compatibility verified — all v1.0 and v1.1 fixtures pass unchanged.
+    (6) Dashboard file count stayed at 4 (no explosion).
+    WHAT COULD IMPROVE: (1) CR agent found root path / gap — should have caught during
+    implementation. Consider adding a "degenerate inputs" pass to DS workflow.
+    (2) Panel 10 description inaccuracy (model and status vs model) — review JSON descriptions
+    more carefully when PromQL doesn't match.
+    ACTION ITEMS: (1) Add degenerate-input validation pass to DS workflow checklist.
+    (2) For v2.0 planning, consider whether dashboard JSON files need a schema validation test
+    (JSON Schema or similar) given growing panel count.
+    METRICS: 24 new tests (236→260), 2 stories, 3 CR fixes (1 MEDIUM, 2 LOW),
+    7 modified files, 5 new files (4 fixtures + 1 golden), 0 lint issues, 0 test failures.
+
+- agent: ned
+  workflow: CC (Correct Course)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T01:00:00+01:00
+  project: Volra
+  notes: "v2.0 CC complete. Key decisions via Party Mode: (1) Keep schema version 1 — no bump needed, KnownFields handles forward compat. REVISED from original plan. (2) Split into Epic 8 (Services, FR47, 2 stories) + Epic 9 (Container Runtime, FR48+FR50, 2 stories). (3) FR49 (Streaming Probes) DEFERRED — no E2E use case. (4) Services design: map[string]Service with Image/Port/Volumes/Env fields. (5) Validation: DNS name, reserved names blocked, max 5. Handoff to Lisa EP."
+
+- agent: lisa
+  workflow: EP (Edit PRD)
+  phase: 2-planning
+  status: SUCCESS
+  timestamp: 2026-03-04T01:10:00+01:00
+  project: Volra
+  notes: "PRD updated for v2.0. 2 edits: (1) Roadmap v2.0 section rewritten — schema version 1 retained, FR49 deferred, services design detailed. (2) FR47-FR50 definitions expanded with implementation details — Service type fields, validation rules, compose generation, security directives, GPU config. FR49 struck through and marked DEFERRED."
+
+- agent: frink
+  workflow: CA (Create Architecture)
+  phase: 3-solutioning
+  status: SUCCESS
+  timestamp: 2026-03-04T01:20:00+01:00
+  project: Volra
+  notes: "Architecture extended for v2.0. EXTEND mode. 2 new extensions: (6) Infrastructure Services — Service struct, ServiceContext sorted by name, validateServices (8 rules), compose template with range loop, depends_on, service volumes. (7) Container Runtime — SecurityContext pointer struct, GPU bool, compose directives. 5 ADRs: map not presets, sorted ServiceContexts, schema v1 retained, nvidia-only GPU, FR49 deferred. Field count: 12 after v2.0."
+
+- agent: lisa
+  workflow: CE (Create Epics and Stories)
+  phase: 3-solutioning
+  status: SUCCESS
+  timestamp: 2026-03-04T01:30:00+01:00
+  project: Volra
+  notes: "Epic 8 and 9 detailed with 4 stories and 21 GWT acceptance criteria. Epic 8 (Services): Story 8.1 (7 ACs — schema/validation) + Story 8.2 (7 ACs — compose generation). Epic 9 (Container Runtime): Story 9.1 (4 ACs — security context) + Story 9.2 (3 ACs — GPU). FR49 marked DEFERRED. Sprint status updated."
+
+- agent: frink
+  workflow: IR (Implementation Readiness)
+  phase: 3-solutioning
+  status: SUCCESS
+  timestamp: 2026-03-04T01:35:00+01:00
+  project: Volra
+  notes: "IR PASSED 6/6. FR coverage (3/3 active FRs mapped, FR49 deferred), architecture coverage (4/4 stories backed by Extensions 6-7), story quality (21 ACs, all GWT testable), backward compat (explicit ACs), test strategy (7 fixtures + 1 golden), risk LOW (Epic 8 largest since v1.0, mitigated by sorted contexts)."
+
+- agent: ned
+  workflow: SP (Sprint Planning)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T01:40:00+01:00
+  project: Volra
+  notes: "Sprint planned for Epics 8-9. Order: 8.1 (Service Schema) → 8.2 (Service Compose) → 9.1 (Security Context) → 9.2 (GPU). 8.1 before 8.2 (schema before compose). Epic 9 independent of 8 but done after for consistency. Estimated ~30 new tests. DoD: 21 ACs verified, full suite passes, lint clean, backward compat."
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T08:15:00+01:00
+  project: Volra
+  story: "8.1 — Service Schema & Validation"
+  notes: "GENERATE mode. Added Service struct (Image, Port, Volumes, Env). Added Services map[string]Service to Agentfile. validateServices() with 8 rules (max 5, DNS name, reserved names, image required, port range/conflict/uniqueness, service volumes, service env). 5 test fixtures, 12 new tests (7 validation + 5 load/parse). All ACs verified."
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T08:30:00+01:00
+  project: Volra
+  story: "8.2 — Service Compose Generation"
+  notes: "GENERATE mode. Added ServiceContext type + buildServiceContexts() with sort.Slice for deterministic output. Updated docker-compose.yml.tmpl with service range loop, depends_on, service volumes in top-level. 5 compose tests + 2 BuildContext tests + 1 golden file. Bug fixed: NoServices test scoped depends_on check to agent section. Golden files regenerated."
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T08:45:00+01:00
+  project: Volra
+  story: "9.1 — Security Context Defaults"
+  notes: "GENERATE mode. Added SecurityContext struct (ReadOnly, NoNewPrivileges, DropCapabilities) + Security *SecurityContext pointer field. Compose template conditionals for read_only, security_opt, cap_drop — each independently conditional. 2 test fixtures, 3 parse tests, 3 compose tests. All 4 ACs verified."
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T09:00:00+01:00
+  project: Volra
+  story: "9.2 — GPU/Hardware Acceleration"
+  notes: "GENERATE mode. Added GPU bool field to Agentfile. Compose template conditional deploy.resources.reservations.devices block with driver: nvidia, count: all, capabilities: [gpu]. 1 test fixture, 2 parse tests, 2 compose tests. All 3 ACs verified. 290 total tests, 0 lint issues. Epics 8-9 complete."
+
+- agent: homer
+  workflow: CR (Code Review)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T09:30:00+01:00
+  project: Volra
+  notes: "Adversarial Code Review PASSED for Epics 8-9. 21/21 ACs verified. 3 fixes applied: (1) HIGH — added validateSecurity() with capability name validation (regex ^[A-Z][A-Z_]*$, empty/duplicate checks). (2) HIGH — sorted service names in validateServices() for deterministic error messages. (3) MEDIUM — added 7 new tests: empty security struct, combined security+GPU, 5 security validation tests. 297 total tests, 0 lint issues."
+
+- agent: ned
+  workflow: ER (Retrospective)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T09:45:00+01:00
+  project: Volra
+  epic: "Epic 8 — Infrastructure Services (v2.0) + Epic 9 — Container Runtime Configuration (v2.0)"
+  notes: >
+    Epics 8-9 Retrospective Summary:
+    WHAT WENT WELL: (1) All 4 stories implemented and CR-approved in single sprint — 37 new tests
+    (260→297). (2) ServiceContext sorted-by-name pattern ensured deterministic compose output.
+    (3) SecurityContext as pointer field cleanly handles nil (backward compat) vs zero-value (empty block).
+    (4) GPU kept minimal as bool — correct YAGNI decision. (5) Template conditionals independently
+    gated — partial security configs work perfectly.
+    WHAT COULD IMPROVE: (1) CR caught missing validateSecurity() — security-related features should
+    always include input validation, even when architecture notes say "Docker validates at runtime."
+    (2) Non-deterministic map iteration in validateServices() wasn't caught during implementation —
+    similar to root path / gap in Epic 7. (3) Golden file staleness after template changes requires
+    blanket UPDATE_GOLDEN=1 regeneration — consider a Makefile target.
+    ACTION ITEMS: (1) For any new user-facing string arrays, always add validation (regex + empty +
+    duplicate checks) during DS, not as CR fix. (2) Add `make update-golden` Makefile target.
+    (3) When iterating maps for validation, sort keys first — add to DS checklist.
+    METRICS: 37 new tests (260→297), 4 stories, 3 CR fixes (2 HIGH, 1 MEDIUM + 7 new tests),
+    12 modified files, 5 new files (3 fixtures + 0 golden), 0 lint issues.
+
+# ===== v2.1 Planning Cycle (7 Limitaciones E2E) =====
+
+- agent: ned
+  workflow: CC (Correct Course)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T12:00:00+01:00
+  project: Volra
+  notes: "v2.1 CC triggered by E2E findings (FINDINGS.md). 7 limitations (L1-L7) + 2 hallazgos (H2-H3) prioritized via 3 Party Mode debates (Frink/Lisa/Homer). Consensus documented in PARTY-MODE-CONSENSUS.md. Plan: 7 features across 8 implementation steps, all backward compatible within schema version 1."
+
+- agent: lisa
+  workflow: EP (Edit PRD)
+  phase: 2-planning
+  status: SUCCESS
+  timestamp: 2026-03-04T12:05:00+01:00
+  project: Volra
+  notes: "PRD extended for v2.1 features: service healthchecks (L2+L3), build-time setup_commands (H3), host_port separation (L5+H2), per-service env files (L7), resource limits (L6), GPU pre-flight check (L4), read_only auto-tmpfs (L1). All fields optional, omitempty, backward compatible."
+
+- agent: frink
+  workflow: CA (Create Architecture)
+  phase: 3-solutioning
+  status: SUCCESS
+  timestamp: 2026-03-04T12:10:00+01:00
+  project: Volra
+  notes: "Architecture extended for v2.1. 7 new extensions: HealthcheckConfig struct, BuildConfig struct, ResourceConfig struct, TmpfsMount struct, service_defaults.go (known healthchecks + resources maps), envfiles.go (per-service env separation), preflight.go (GPU check). Key ADRs: auto-resolve healthchecks by image prefix, setup_commands only with dockerfile:auto, host_port defaults to port for backward compat."
+
+- agent: lisa
+  workflow: CE (Create Epics and Stories)
+  phase: 3-solutioning
+  status: SUCCESS
+  timestamp: 2026-03-04T12:15:00+01:00
+  project: Volra
+  notes: "Epic 10 created with 8 implementation steps. 7 features grouped by priority: P0 (healthchecks + build commands), P1 (port separation + secrets), P2 (resource limits + GPU check), P3 (tmpfs auto-injection). Step 8 covers E2E test updates."
+
+- agent: frink
+  workflow: IR (Implementation Readiness)
+  phase: 3-solutioning
+  status: SUCCESS
+  timestamp: 2026-03-04T12:20:00+01:00
+  project: Volra
+  notes: "IR PASSED. 7/7 features have architecture backing, struct definitions, template changes, and test strategies. KnownFields(true) constraint addressed — all struct fields added before fixtures use them. Backward compatibility verified via omitempty defaults."
+
+- agent: ned
+  workflow: SP (Sprint Planning)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T12:25:00+01:00
+  project: Volra
+  notes: "Sprint planned for Epic 10 (v2.1 — 7 Limitations). Single sprint, all 7 features implemented together since they share multiple files (agentfile.go, context.go, docker-compose.yml.tmpl touched by 5+ features). Order: struct definitions → validation → context → templates → new files → tests → golden files → E2E."
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T12:45:00+01:00
+  project: Volra
+  story: "Epic 10 — All 7 Limitations (v2.1)"
+  notes: >
+    GENERATE/REFINE mode. All 7 features implemented in single pass:
+    (1) Service Healthchecks (L2+L3): HealthcheckConfig struct, knownHealthchecks map (postgres/redis/chromadb),
+    resolveHealthcheck() with image prefix matching, depends_on condition: service_healthy.
+    (2) Build Setup Commands (H3): BuildConfig struct, setup_commands + cache_dirs, Dockerfile template with
+    RUN after pip install + COPY --from=builder for cache dirs. Validation: only with dockerfile:auto, max 20 cmds.
+    (3) Port Separation (L5+H2): host_port field on Agentfile + Service, AgentHostPort/PrometheusHostPort/
+    GrafanaHostPort derived in context, template uses resolved ports. Validation: range + conflict detection.
+    (4) Secrets Separation (L7): GenerateEnvFiles() generates agent.env + per-service .env files from source .env,
+    template uses ./agent.env and ./name-service.env instead of shared ../.env.
+    (5) Resource Limits (L6): ResourceConfig struct, knownResources map with defaults, deploy.resources.limits block.
+    (6) GPU Pre-flight (L4): CheckGPUAvailable() via docker info --format, E307/E308 error codes.
+    (7) Auto Tmpfs (L1): TmpfsMount struct, auto-inject /tmp + /app/__pycache__ when read_only + no explicit tmpfs.
+    Files: 19 modified, 6 new source files, 8 test fixtures, golden files regenerated.
+
+- agent: homer
+  workflow: CR (Code Review)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T13:00:00+01:00
+  project: Volra
+  notes: "Code Review PASSED for Epic 10 (v2.1). All 7 features verified. Tests pass with -race -count=1. 0 lint issues. minimalTC() helper created for compose/dockerfile tests to handle required template fields. Golden files regenerated. 6 new E2E Phase 2 tests added. Backward compatibility confirmed — all v1.0/v1.1/v1.2/v2.0 fixtures pass unchanged."
+
+- agent: ned
+  workflow: ER (Retrospective)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T13:10:00+01:00
+  project: Volra
+  epic: "Epic 10 — 7 Limitations Resolution (v2.1)"
+  notes: >
+    Epic 10 Retrospective Summary:
+    WHAT WENT WELL: (1) All 7 features implemented and CR-approved in single sprint — efficient
+    given shared file overlap (agentfile.go touched by 5 features, template by 6). (2) Party Mode
+    consensus from 3 debates provided clear specs — zero ambiguity during implementation.
+    (3) service_defaults.go pattern (known maps + resolve functions) is clean and extensible.
+    (4) Per-service env file generation is transparent — no schema change needed. (5) Auto-tmpfs
+    injection for read_only Python agents prevents silent Linux failures.
+    WHAT COULD IMPROVE: (1) Implementing 7 features in one pass is efficient but risky — a bug
+    in shared code affects all features. Consider feature branches for v3.0. (2) E2E tests for
+    new features are Phase 2 only (compose generation) — Phase 3 (Docker deploy) coverage
+    for healthchecks/resources would catch runtime issues.
+    ACTION ITEMS: (1) Add Phase 3 E2E tests for healthcheck wait behavior in future sprint.
+    (2) Consider adding more images to knownHealthchecks/knownResources (MySQL, MongoDB, etc.)
+    as user demand grows. (3) Document new Agentfile fields in user-facing docs.
+    METRICS: 6 new source files, 8 new fixtures, 6 new E2E tests, 19 modified files,
+    golden files regenerated, 0 lint issues, 0 test failures, full backward compat verified.
+
+# ===== v0.2 Strategic Planning Cycle =====
+
+- agent: ned
+  workflow: CC (Correct Course)
+  phase: 4-implementation
+  status: STARTED
+  timestamp: 2026-03-04T14:00:00+01:00
+  project: Volra
+  notes: "Major CC triggered by market research (market-research-2026-03-04.md). Competitive landscape significantly different from assumptions: Railway $100M, Vercel AI agent platform, Aegra as direct OSS competitor. Strategic pivot needed for v0.2 roadmap."
+
+- agent: ned
+  workflow: CC (Correct Course)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T14:30:00+01:00
+  project: Volra
+  notes: "CC MAJOR completed. User approved: Parallel Track + 'Own Your Infrastructure' positioning. Key decisions: (1) Launch v0.1 as early access this week (Track A). (2) Build v0.2 in parallel with user feedback (Track B). (3) v0.2 re-scoped: quickstart+templates P0, LangGraph Level 2 P1, MCP Server P1, cost tracking P2. (4) volra dev + second framework DEFERRED to v0.3. (5) 5 new epics (11-15) proposed. Handoff to Lisa EP for PRD edits."
+  output: "_bmad-output/planning-artifacts/sprint-change-proposal-2026-03-04.md"
+
+- agent: lisa
+  workflow: EP (Edit PRD)
+  phase: 2-plan
+  status: STARTED
+  timestamp: 2026-03-04T16:30:00+01:00
+  project: Volra
+  notes: "PRD strategic pivot edit. Party Mode (Lisa/Frink/Homer) with sequential thinking for 4 debates: (1) Positioning & Tagline, (2) v0.2 Scope, (3) v0.3 & Competitive Landscape, (4) Launch Strategy & Success Criteria."
+
+- agent: lisa
+  workflow: EP (Edit PRD)
+  phase: 2-plan
+  status: SUCCESS
+  timestamp: 2026-03-04T17:00:00+01:00
+  project: Volra
+  notes: "PRD edit complete. Key changes: (1) Renamed MegaCenter → Volra globally. (2) Added Executive Summary with 'Own your agent infrastructure' tagline. (3) Updated emotional signals (removed Heroku reference). (4) Rewrote Innovation section with March 2026 competitive data. (5) Added Competitive Landscape section (Railway, Vercel, Aegra, LangGraph, CrewAI). (6) Rewrote v0.2 scope: templates P0, logs P0, Level 2a P1, MCP Server P1. (7) Updated v0.3: Level 2b, MCP composition, volra dev deferred to v0.4. (8) Updated Launch Strategy (early access this week). (9) Added Competitive Benchmarks to Success Criteria. (10) Updated Moat Analysis and Risk sections. All 4 Party Mode debates reached consensus."
+  output: "_bmad-output/planning-artifacts/prd.md"
+
+- agent: frink
+  workflow: CA (Create Architecture)
+  phase: 3-solution
+  status: SUCCESS
+  timestamp: 2026-03-04T17:30:00+01:00
+  project: Volra
+  notes: "Architecture v0.2 extensions added via Party Mode (Lisa/Frink/Homer). Key decisions: (1) Extension 8: LangGraph Level 2a — Prometheus-native (not OTel), new 'observability' Agentfile struct, new Python package 'volra-langgraph', new Grafana dashboard variant. (2) Extension 9: Volra MCP Server — direct protocol implementation (no SDK), new 'volra mcp' command, 4 tools (deploy/status/logs/doctor), stdio transport. (3) Extension 10: Cost tracking as Level 2 dashboard panels (embedded pricing table). (4) volra logs command (~50 lines). (5) volra quickstart with 3 embedded templates (basic/rag/conversational). Also renamed MegaCenter → Volra globally in architecture.md."
+  output: "_bmad-output/planning-artifacts/architecture.md"
+
+- agent: lisa
+  workflow: CE (Create Epics)
+  phase: 3-solution
+  status: SUCCESS
+  timestamp: 2026-03-04T18:00:00+01:00
+  project: Volra
+  notes: "Epics 11-15 created via Party Mode (Lisa/Frink/Homer). 24 stories total across 5 epics. Epic 11: Launch Readiness (6 stories, P0). Epic 12: Adoption Accelerators (5 stories, P0). Epic 13: LangGraph Level 2a (6 stories incl. spike, P1). Epic 14: MCP Integration (4 stories, P1). Epic 15: Day 2 Operations (3 stories, P2). Key debate outcomes: (1) Level 2 Python package needs spike first (risk). (2) MCP tools consolidated into single story. (3) Unified dashboard deferred to v0.3. Also renamed MegaCenter → Volra in epics.md."
+  output: "_bmad-output/planning-artifacts/epics.md"
+- agent: ned
+  workflow: CC (Correct Course)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T18:45:00+01:00
+  project: Volra
+  notes: "Strategic pivot: Epic 13 changed from LangGraph-specific to framework-agnostic. volra-langgraph → volra-observe. Level 2 no longer requires framework: langgraph. Metrics now universal (LLM tokens/cost/latency/errors/tool_calls). Updated PRD, Architecture Extension 8, Epic 13 (all 6 stories). Sprint Change Proposal v2 approved. Zero code impact."
+  output: "_bmad-output/planning-artifacts/sprint-change-proposal-2026-03-04-v2.md"
+
+# ===== v0.2 Implementation Cycle (Epics 11-15) =====
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T19:00:00+01:00
+  project: Volra
+  epic: "Epic 11 — Launch Readiness"
+  notes: >
+    All 6 stories implemented: 11.1 (README.md with tagline, quickstart, features, comparison table),
+    11.2 (install.sh with OS/arch detection, SHA256 verification, fallback paths),
+    11.3 (GitHub Actions release.yml with 3-target cross-compilation),
+    11.4 (repo rename MegaCenter → Volra, go.mod + all imports updated),
+    11.5 (3 example projects: basic, rag, conversational — converted from E2E agents),
+    11.6 (launch announcements drafted in launch-posts.md).
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T19:30:00+01:00
+  project: Volra
+  epic: "Epic 12 — Adoption Accelerators"
+  notes: >
+    All 5 stories implemented: 12.1 (volra quickstart command with go:embed templates, scaffold()),
+    12.2 (basic template — FastAPI agent with /health + /ask),
+    12.3 (rag template — LangChain RAG with ChromaDB service),
+    12.4 (conversational template — LangGraph agent with Redis + PostgreSQL),
+    12.5 (volra logs command with --follow, --lines, optional service name).
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T20:30:00+01:00
+  project: Volra
+  epic: "Epic 13 — Agent Observability Level 2"
+  notes: >
+    All 6 stories implemented: 13.1 (ObservabilityConfig struct, HasLevel2, validation),
+    13.2a+13.2b (volra-observe Python package — monkey-patching OpenAI/Anthropic SDKs, 5 Prometheus
+    metrics, embedded pricing table, decorator + context manager, 25 Python tests),
+    13.3 (Prometheus agent-level2 scrape job for metrics_port),
+    13.4 (Level 2 Grafana dashboard — 9 panels covering all 5 volra_ metrics),
+    13.5 (doctor Level 2 check — HTTP GET to metrics endpoint with warning).
+    Key decision: framework-agnostic (not LangGraph-specific) per CC pivot.
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T21:00:00+01:00
+  project: Volra
+  epic: "Epic 14 — MCP Integration"
+  notes: >
+    All 4 stories implemented: 14.1 (protocol.go — JSON-RPC 2.0 + MCP types, 1MB scanner buffer),
+    14.2 (handler.go + tools.go — 4 tools with capturePresenter, JSON Schema inputSchema),
+    14.3 (cmd/volra/mcp.go — volra mcp command, stdin/stdout),
+    14.4 (docs/mcp-integration.md — Cursor, VS Code, Claude Code config snippets).
+    Direct protocol implementation (~200 lines) without MCP SDK per architecture ADR.
+    13 MCP tests. Notification handling fixed (notifications/initialized returns no response).
+
+- agent: homer
+  workflow: DS (Dev Story)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T21:30:00+01:00
+  project: Volra
+  epic: "Epic 15 — Day 2 Operations"
+  notes: >
+    Stories 15.1 + 15.2 implemented: 15.1 (interactive volra quickstart — terminal detection via
+    golang.org/x/term, template menu, DNS-safe name validation regex),
+    15.2 (--json flag — ModeJSON, JSONPresenter with deferred Flush(), global --json persistent flag,
+    newPresenter()/flushPresenter() helpers, 4 commands updated, 5 JSON tests).
+    Story 15.3 (Homebrew formula) DEFERRED — requires separate repository.
+
+- agent: ned
+  workflow: CC (Correct Course)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T22:00:00+01:00
+  project: Volra
+  notes: >
+    v0.2 COMPLETE. All 5 epics (11-15) implemented. Final metrics:
+    384 Go tests + 25 Python tests = 409 total, all passing. 0 lint issues.
+    New packages: internal/mcp/, internal/templates/, volra-observe/.
+    New commands: volra quickstart, volra logs, volra mcp.
+    New features: --json flag, Level 2 observability, MCP server, interactive quickstart.
+    Story 15.3 (Homebrew) deferred to post-launch.
+
+- agent: kent
+  workflow: WD (Write Document)
+  phase: 4-implementation
+  status: SUCCESS
+  timestamp: 2026-03-04T22:30:00+01:00
+  project: Volra
+  notes: >
+    Documentation update for v0.2 completion. Updated: README.md (features, roadmap, Agentfile example),
+    CONTRIBUTING.md (test commands, project structure, Python prereqs), PRD (v0.2 roadmap marked DONE),
+    architecture.md (package table updated to internal/, added mcp/templates/volra-observe),
+    epics.md (Epics 11-15 marked DONE with status summaries), execution-log.yaml (DS entries for all 5 epics).

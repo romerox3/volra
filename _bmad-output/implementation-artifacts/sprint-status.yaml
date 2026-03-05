@@ -79,3 +79,28 @@ development_status:
   5-2-install-script: done
   5-3-open-source-project-artifacts: done
   epic-5-retrospective: optional
+
+  # Epic 6: Operational Polish (v1.1)
+  epic-6: done
+  6-1-configurable-health-timeout: done
+  6-2-multi-stage-dockerfile-builds: done
+  6-3-custom-metrics-dashboard-panels: done
+  epic-6-retrospective: done
+
+  # Epic 7: Data Persistence & LLM Observability (v1.2)
+  epic-7: done
+  7-1-persistent-volume-mounts: done
+  7-2-llm-token-tracking-dashboard-panels: done
+  epic-7-retrospective: done
+
+  # Epic 8: Infrastructure Services (v2.0)
+  epic-8: done
+  8-1-service-schema-validation: done
+  8-2-service-compose-generation: done
+  epic-8-retrospective: done
+
+  # Epic 9: Container Runtime Configuration (v2.0)
+  epic-9: done
+  9-1-security-context-defaults: done
+  9-2-gpu-hardware-acceleration: done
+  epic-9-retrospective: done

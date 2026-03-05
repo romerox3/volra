@@ -13,7 +13,7 @@ Status: done
 ```gherkin
 Given the repository is freshly cloned
 When I run `go mod tidy`
-Then go.mod exists with module `github.com/antonioromero/volra`
+Then go.mod exists with module `github.com/romerox3/volra`
   And go.sum contains entries for cobra, yaml.v3, and testify
 
 Given the repository is freshly cloned
@@ -63,7 +63,7 @@ Then all 3 dependencies resolve and are recorded in go.mod and go.sum
 ## Tasks / Subtasks
 
 - [x] **Task 1: Initialize Go module** (AC: #1)
-  - [x] Run `go mod init github.com/antonioromero/volra`
+  - [x] Run `go mod init github.com/romerox3/volra`
   - [x] Add 3 dependencies: cobra, yaml.v3, testify
   - [x] Run `go mod tidy` to verify resolution
 
@@ -110,7 +110,7 @@ The planning artifacts (PRD, Architecture, Epics) all reference "MegaCenter" and
 | Planning Artifact Says | Implementation Uses |
 |------------------------|---------------------|
 | `megacenter` (binary name) | `volra` |
-| `github.com/antonioromero/megacenter` | `github.com/antonioromero/volra` |
+| `github.com/antonioromero/megacenter` | `github.com/romerox3/volra` |
 | `cmd/megacenter/` | `cmd/volra/` |
 | `MegaCenter` (user-facing text) | `Volra` |
 | `.megacenter/` (generated output dir) | `.volra/` |
@@ -122,7 +122,7 @@ The planning artifacts (PRD, Architecture, Epics) all reference "MegaCenter" and
 
 **Source:** [architecture.md — Project Structure & Boundaries]
 
-- **Module:** `github.com/antonioromero/volra`
+- **Module:** `github.com/romerox3/volra`
 - **Layout:** `internal/` not `pkg/` — CLI tool, not a library. Enforced by Go compiler.
 - **Package `setup` not `init`:** Avoids collision with Go's `func init()`. CLI command is `volra init`, package is `setup`.
 - **3 external deps only:** cobra, yaml.v3, testify. No others. Period.
@@ -318,7 +318,7 @@ Stub packages with `package <name>` declaration only. No business logic.
 
 - All paths use `volra` (not `megacenter`) as the project name
 - The root directory may still be named `MegaCenter/` on disk — that's the working directory, not the Go module name
-- `go.mod` module path is `github.com/antonioromero/volra`
+- `go.mod` module path is `github.com/romerox3/volra`
 - Binary name is `volra`
 
 ### References
@@ -364,7 +364,7 @@ Claude Opus 4.6 (claude-opus-4-6)
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `go.mod` | Created | Module `github.com/antonioromero/volra` |
+| `go.mod` | Created | Module `github.com/romerox3/volra` |
 | `go.sum` | Generated | Dependency checksums |
 | `cmd/volra/main.go` | Created | Entry point with ldflags version |
 | `cmd/volra/root.go` | Created | Cobra root command |

@@ -5,12 +5,12 @@ status: 'complete'
 completedAt: '2026-03-02'
 inputDocuments:
   - '_bmad-output/planning-artifacts/prd.md'
-  - '_bmad-output/planning-artifacts/product-brief-MegaCenter-2026-03-02.md'
+  - '_bmad-output/planning-artifacts/product-brief-Volra-2026-03-02.md'
   - '_bmad-output/brainstorming/brainstorming-session-2026-03-02.md'
   - 'guide.md'
 workflowType: 'architecture'
 executionMode: 'GENERATE'
-project_name: 'MegaCenter'
+project_name: 'Volra'
 user_name: 'Antonio'
 date: '2026-03-02'
 ---
@@ -73,10 +73,10 @@ _5 rounds of Party Mode validation. 30 adjustments proposed, consolidated to 18 
 |-----------|-----------|
 | **Type** | CLI tool + infrastructure generator |
 | **Complexity** | Medium — 4 commands, file generation, Docker orchestration |
-| **State model** | Zero CLI state — project directory is the persistent context. The Agentfile persists between init and deploy. `.megacenter/` is regenerated each deploy. Prometheus volumes persist across rebuilds (NFR9) |
-| **Component count** | 7 Go packages (4 command + 2 shared + 1 wiring — see below) |
+| **State model** | Zero CLI state — project directory is the persistent context. The Agentfile persists between init and deploy. `.volra/` is regenerated each deploy. Prometheus volumes persist across rebuilds (NFR9) |
+| **Component count** | 11 Go packages (5 command + 4 shared + 1 wiring + 1 test) + 1 Python package (volra-observe) |
 | **External dependencies** | Docker Engine, Docker Compose V2, Go standard library |
-| **Generated artifact types** | 5 (Dockerfile, docker-compose.yml, prometheus.yml, Grafana dashboard JSON ×2) |
+| **Generated artifact types** | 7+ (Dockerfile, docker-compose.yml, prometheus.yml, Grafana dashboard JSON ×3 (overview, detail, level2), per-service env files, alert_rules.yml) |
 | **Highest-risk component** | deploy/ — largest package, Dockerfile generation flagged as highest complexity/fragility in PRD |
 
 ### Go Package Structure (Preliminary)
@@ -85,13 +85,18 @@ _Converged through 5 rounds of Party Mode. Principle: 1 package per CLI command,
 
 | Package | Type | FRs | Responsibility |
 |---------|------|-----|---------------|
-| `cmd/` | Wiring | — | main.go + subcommand parsing (flag parsing, calls domain packages). No business logic |
-| `pkg/doctor/` | Command | FR1-FR3 | Environment checks, fix suggestions, exit codes |
-| `pkg/init/` | Command | FR4-FR15 | Scan project → build Agentfile model → write Agentfile + .env.example + .gitignore. Pipeline: scan → structure → persist |
-| `pkg/deploy/` | Command | FR16-FR26, FR31-FR37 | Read Agentfile → generate artifacts → execute docker compose → verify health. Internal structure by file: `dockerfile.go`, `compose.go`, `prometheus.go`, `grafana.go`, `orchestrate.go`, `healthcheck.go` |
-| `pkg/status/` | Command | FR27-FR30 | Query Docker for container states, health check, daemon detection. Read-only |
-| `pkg/agentfile/` | Shared | Cross-cutting | Parse, validate, apply defaults, schema version check. Used by init (write), deploy (read), status (read) |
-| `pkg/output/` | Shared | Cross-cutting | Unified Presenter — the ONLY point of emission to stdout. Formatting, colors, NO_COLOR/TERM=dumb, progress indicators, structured errors per NFR22-23. No other package writes directly to stdout |
+| `cmd/volra/` | Wiring | — | main.go + Cobra subcommands (doctor, init, deploy, status, logs, quickstart, mcp). `--json` flag, `newPresenter()`/`flushPresenter()` helpers. No business logic |
+| `internal/doctor/` | Command | FR1-FR3 | Environment checks, fix suggestions, exit codes. Level 2 metrics endpoint check |
+| `internal/setup/` | Command | FR4-FR15 | Scan project → build Agentfile model → write Agentfile + .env.example + .gitignore. Pipeline: scan → structure → persist |
+| `internal/deploy/` | Command | FR16-FR26, FR31-FR37 | Read Agentfile → generate artifacts → execute docker compose → verify health. Files: `dockerfile.go`, `compose.go`, `prometheus.go`, `grafana.go`, `orchestrate.go`, `healthcheck.go`, `service_defaults.go`, `envfiles.go`, `preflight.go` |
+| `internal/status/` | Command | FR27-FR30 | Query Docker for container states, health check, daemon detection. Read-only |
+| `internal/agentfile/` | Shared | Cross-cutting | Parse, validate, apply defaults, schema version check. Structs: Agentfile, Service, SecurityContext, ObservabilityConfig, BuildConfig, HealthcheckConfig, ResourceConfig, TmpfsMount |
+| `internal/output/` | Shared | Cross-cutting | Unified Presenter (color, nocolor, plain, JSON). `--json` via `JSONPresenter` with deferred `Flush()`. Structured errors (UserError) and warnings (UserWarning) |
+| `internal/mcp/` | Command | — | MCP server: JSON-RPC 2.0 protocol over stdio. 4 tools: `volra_deploy`, `volra_status`, `volra_logs`, `volra_doctor`. Direct protocol implementation (no SDK) |
+| `internal/templates/` | Shared | — | Embedded quickstart templates (basic, rag, conversational) via `go:embed`. Template scaffolding with name substitution |
+| `internal/docker/` | Shared | Cross-cutting | DockerRunner interface for shelling out to `docker` / `docker compose` |
+| `internal/testutil/` | Test | — | Test helpers: mocks, golden file utilities |
+| `volra-observe/` | External | — | Python package: framework-agnostic LLM observability. Auto-patches OpenAI/Anthropic SDKs. 5 Prometheus metrics |
 
 **deploy/ complexity note:** This is the largest package with 6 internal files covering 4 types of artifact generation + orchestration + health verification. Internal file discipline documented here; detailed design in subsequent architecture steps.
 
@@ -103,13 +108,13 @@ _Converged through 5 rounds of Party Mode. Principle: 1 package per CLI command,
 | 1 | Go single binary | PRD: Installation | Cross-compile for 3 targets (macOS ARM64, Ubuntu AMD64, Debian AMD64), embed templates |
 | 2 | 3 containers per project | PRD: Scoping | Docker Compose as sole orchestrator |
 | 3 | Probe-based metrics only | PRD: FR31, Scoping | No sidecar, no gateway, Prometheus scrapes health_path directly |
-| 4 | Idempotent regeneration | PRD: Design Constraints | `.megacenter/` always fully regenerated, no merge. Generated artifacts are ephemeral |
+| 4 | Idempotent regeneration | PRD: Design Constraints | `.volra/` always fully regenerated, no merge. Generated artifacts are ephemeral |
 | 5 | Python-only detection | PRD: Scoping | Detector hardcoded to Python patterns (v0.1) |
 | 6 | Framework: generic + LangGraph | PRD: FR5 | Detection strategy extensible but only 2 implementations shipped |
 | 7 | No plugins, no hooks | PRD: Design Constraints | Override = edit generated files. No user-facing extension points |
 | 8 | v0.2 migration path | PRD: Scoping | v0.1 independent stacks → v0.2 shared infrastructure. Architecture must not block this transition |
 | 9 | Topology variation point | Party Mode R2 | Templates must support standalone (v0.1) vs shared (v0.2) topology. v0.1 implements standalone only, but the template structure must accommodate the switch without rewrite |
-| 10 | Artifact vs data lifecycle | Party Mode R4 | Generated artifacts (`.megacenter/`) are ephemeral — regenerated every deploy. Runtime data (Prometheus volumes) is persistent — survives rebuilds. Two distinct lifecycle domains that must not be conflated |
+| 10 | Artifact vs data lifecycle | Party Mode R4 | Generated artifacts (`.volra/`) are ephemeral — regenerated every deploy. Runtime data (Prometheus volumes) is persistent — survives rebuilds. Two distinct lifecycle domains that must not be conflated |
 | 11 | Go idioms over abstractions | Party Mode R4 | No pipeline frameworks, no DI containers, no custom middleware chains. Functions calling functions. `if err != nil` is the error strategy. Standard library first, external deps only when unavoidable |
 
 ### External Integration Points
@@ -194,7 +199,7 @@ _3 rounds of Party Mode. 14 adjustments consolidated. Key decisions: Cobra (with
 4. Shell completion for bash/zsh/fish/PowerShell (free, not critical for 4 commands but nice)
 5. `--version` flag automatic
 
-**Explicitly NOT included: Viper.** MegaCenter has no config file system. The Agentfile is parsed directly with yaml.v3 in `internal/agentfile/`. Viper would add ~15 transitive dependencies for zero benefit. Any tutorial suggesting Viper integration should be ignored.
+**Explicitly NOT included: Viper.** Volra has no config file system. The Agentfile is parsed directly with yaml.v3 in `internal/agentfile/`. Viper would add ~15 transitive dependencies for zero benefit. Any tutorial suggesting Viper integration should be ignored.
 
 #### Template & Static Asset Strategy
 
@@ -208,7 +213,7 @@ Two categories of embeddable files, with distinct processing strategies:
 **Why dashboards are static, not templates:**
 - Grafana dashboard JSON is deeply nested (200-400 lines). Go templates (`{{ }}`) inside JSON (`{}`) creates an escaping nightmare
 - Grafana provides native template variables (`$agent_name`) — panel queries reference these variables, defined once in the dashboard JSON
-- The only dynamic value MegaCenter needs to inject is the Prometheus datasource URL, which is handled via the datasource provisioning YAML (a template), not the dashboard JSON itself
+- The only dynamic value Volra needs to inject is the Prometheus datasource URL, which is handled via the datasource provisioning YAML (a template), not the dashboard JSON itself
 - Static dashboards only need `json.Valid()` tests, not golden file testing — simpler to maintain
 
 **For files needing minimal injection** (not full template logic): `strings.NewReplacer()` with `${PLACEHOLDER}` convention. One call, explicit, debuggable.
@@ -216,9 +221,9 @@ Two categories of embeddable files, with distinct processing strategies:
 #### Project Structure
 
 ```
-megacenter/
+volra/
 ├── cmd/
-│   └── megacenter/
+│   └── volra/
 │       └── main.go                    # Entry point, Cobra root command, subcommand registration
 ├── internal/
 │   ├── doctor/                        # FR1-FR3: environment checks
@@ -260,8 +265,8 @@ megacenter/
 ```
 
 **Key structure decisions:**
-- **`internal/` not `pkg/`**: MegaCenter is a CLI tool, not a library. `internal/` is enforced by the Go compiler — no external package can import these. Aligned with constraint #7 (no plugins, no hooks)
-- **`internal/setup/` not `internal/init/`**: Avoids semantic collision with Go's special `func init()`. The CLI command is `megacenter init`, the package is `setup` — different names, same responsibility
+- **`internal/` not `pkg/`**: Volra is a CLI tool, not a library. `internal/` is enforced by the Go compiler — no external package can import these. Aligned with constraint #7 (no plugins, no hooks)
+- **`internal/setup/` not `internal/init/`**: Avoids semantic collision with Go's special `func init()`. The CLI command is `volra init`, the package is `setup` — different names, same responsibility
 - **`testdata/` per package**: Go convention. Each package owns its test fixtures. `go build` ignores `testdata/` directories
 - **`deploy/` internal file structure**: 6 files for the largest package. Not sub-packages — Go idiom is flat packages with clear file boundaries
 
@@ -269,7 +274,7 @@ megacenter/
 
 **No Docker SDK.** All Docker interaction via `os/exec.Command("docker", ...)` shell-out.
 
-**Rationale:** The Docker Go SDK (`github.com/docker/docker/client`) would add 20+ transitive dependencies for 3 operations: check if running, compose up, query container status. `os/exec` is stdlib, zero deps, and sufficient for MegaCenter's needs.
+**Rationale:** The Docker Go SDK (`github.com/docker/docker/client`) would add 20+ transitive dependencies for 3 operations: check if running, compose up, query container status. `os/exec` is stdlib, zero deps, and sufficient for Volra's needs.
 
 **Testability pattern:** A minimal `DockerRunner` interface enables mocking without Docker:
 
@@ -303,9 +308,9 @@ Production implementation wraps `os/exec`. Test implementation returns canned re
 
 **Cross-compile is 3 lines of bash:**
 ```bash
-GOOS=darwin GOARCH=arm64 go build -o dist/megacenter-darwin-arm64 ./cmd/megacenter
-GOOS=linux GOARCH=amd64 go build -o dist/megacenter-linux-amd64 ./cmd/megacenter
-# + sha256sum dist/megacenter-* > dist/checksums.txt
+GOOS=darwin GOARCH=arm64 go build -o dist/volra-darwin-arm64 ./cmd/volra
+GOOS=linux GOARCH=amd64 go build -o dist/volra-linux-amd64 ./cmd/volra
+# + sha256sum dist/volra-* > dist/checksums.txt
 ```
 
 **Makefile over GoReleaser for v0.1:** GoReleaser solves homebrew taps, Docker images, snapcraft, changelogs — none of which exist in v0.1. A Makefile with 5 targets is simpler, educational, and constraint #0 compliant. GoReleaser is a v0.2 upgrade when distribution channels expand.
@@ -313,8 +318,8 @@ GOOS=linux GOARCH=amd64 go build -o dist/megacenter-linux-amd64 ./cmd/megacenter
 ### Initialization Command
 
 ```bash
-mkdir megacenter && cd megacenter
-go mod init github.com/antonioromero/megacenter
+mkdir volra && cd volra
+go mod init github.com/romerox3/volra
 go get github.com/spf13/cobra@latest
 go get gopkg.in/yaml.v3@latest
 go get github.com/stretchr/testify@latest
@@ -331,7 +336,7 @@ _2 rounds of Party Mode. 10 adjustments consolidated. Key decisions: Parse-Don't
 #### Schema Definition
 
 ```yaml
-# Agentfile — generated by megacenter init
+# Agentfile — generated by volra init
 version: 1
 
 name: my-agent
@@ -354,7 +359,7 @@ dockerfile: auto            # auto | custom
 | `port` | integer | Yes | `8000` | Range: 1-65535 |
 | `health_path` | string | Yes | `/health` | Must start with `/` |
 | `env` | list of strings | No | `[]` | Each entry non-empty, no duplicates. Names only — values live in `.env` |
-| `dockerfile` | enum | Yes | `auto` | `auto` = MegaCenter generates. `custom` = uses `./Dockerfile` (must exist, error if not found) |
+| `dockerfile` | enum | Yes | `auto` | `auto` = Volra generates. `custom` = uses `./Dockerfile` (must exist, error if not found) |
 
 **Strict mode:** `yaml.Decoder.KnownFields(true)` — unknown fields cause parse error. Prevents silent typos (e.g., `heath_path` instead of `health_path`). Field validation is version-relative: version 1 accepts these 7 fields, version 2 will accept its expanded set.
 
@@ -403,7 +408,7 @@ type Agentfile struct {
 | **Combined** | `Load(path)` | Calls Parse then Validate. Returns `*Agentfile, error` | Single entry point for all consumers |
 
 **Version compatibility in Parse:**
-- Agentfile `version` > CLI supported → `❌ Agentfile version 2 requires MegaCenter >= v0.2. You have v0.1.0. Update: curl -sSL https://...`
+- Agentfile `version` > CLI supported → `❌ Agentfile version 2 requires Volra >= v0.2. You have v0.1.0. Update: curl -sSL https://...`
 - Agentfile `version` < CLI current → accepted (backward compatible)
 
 #### .env Lifecycle
@@ -411,7 +416,7 @@ type Agentfile struct {
 **Generated by init:** `.env.example` with variable names and empty values, plus instructive header:
 
 ```
-# MegaCenter — Environment Variables
+# Volra — Environment Variables
 # Copy this file to .env and fill in the values
 # Values are injected into your agent container at deploy time
 
@@ -433,13 +438,13 @@ Warning, not error — the variable may have a default in the application code.
 
 - Containers are named: `{name}-agent-1`, `{name}-prometheus-1`, `{name}-grafana-1`
 - **Collision detection:** At deploy, if containers with the same project name already exist from a different directory → warning: `⚠️ A stack named '{name}' is already running. This will replace it. Use a different name in Agentfile to run both.`
-- **Name change detection:** If `.megacenter/` exists with a previous deploy and the name has changed → warning: `⚠️ Previous stack '{old-name}' still running. Stop it with: docker compose -p {old-name} down`
+- **Name change detection:** If `.volra/` exists with a previous deploy and the name has changed → warning: `⚠️ Previous stack '{old-name}' still running. Stop it with: docker compose -p {old-name} down`
 
 #### Re-deploy Strategy (FR25)
 
-Re-running `megacenter deploy` on an existing deployment:
+Re-running `volra deploy` on an existing deployment:
 
-1. Regenerate `.megacenter/` completely (idempotent, constraint #4)
+1. Regenerate `.volra/` completely (idempotent, constraint #4)
 2. Execute `docker compose -p {name} up -d --build` — forces agent image rebuild
 3. Prometheus and Grafana containers are NOT recreated if their config hasn't changed (Docker Compose native behavior)
 4. Prometheus data volumes survive rebuild (NFR9 — named volumes)
@@ -453,7 +458,7 @@ _3 rounds of Party Mode. 15 adjustments consolidated to 12 net decisions. Key: P
 
 **No cleanup on failure. No rollback. Fix and re-run.**
 
-MegaCenter has zero CLI state (Step 2 constraint). Generated artifacts in `.megacenter/` are idempotent — the next deploy overwrites them. Docker Compose manages container lifecycle. If a deploy fails mid-way, the user fixes the issue and runs `megacenter deploy` again. This eliminates an entire category of error handling complexity (rollback logic, partial state cleanup, transaction-like semantics).
+Volra has zero CLI state (Step 2 constraint). Generated artifacts in `.volra/` are idempotent — the next deploy overwrites them. Docker Compose manages container lifecycle. If a deploy fails mid-way, the user fixes the issue and runs `volra deploy` again. This eliminates an entire category of error handling complexity (rollback logic, partial state cleanup, transaction-like semantics).
 
 #### Error & Warning Types
 
@@ -500,9 +505,9 @@ Internal errors (unexpected bugs) are marked with `[INTERNAL]` prefix in the mes
 | Progress (checkmarks, spinners, step-by-step) | stderr | Does not pollute piped output |
 | Errors (`❌`) | stderr | Unix convention |
 | Warnings (`⚠️`) | stderr | Unix convention |
-| Result (summary, URLs, tables) | stdout | Capturable: `megacenter deploy > result.txt` |
+| Result (summary, URLs, tables) | stdout | Capturable: `volra deploy > result.txt` |
 
-This makes MegaCenter pipe-friendly from v0.1. When `--json` arrives in v0.2, JSON goes to stdout clean.
+This makes Volra pipe-friendly from v0.1. When `--json` arrives in v0.2, JSON goes to stdout clean.
 
 #### Presenter Interface
 
@@ -564,7 +569,7 @@ const (
 #### Cobra Integration
 
 ```go
-// cmd/megacenter/main.go
+// cmd/volra/main.go
 rootCmd.SilenceErrors = true   // Cobra does NOT print errors
 rootCmd.SilenceUsage = true    // Cobra does NOT print usage on error
 ```
@@ -581,7 +586,7 @@ defer cancel()
 
 - `context.Context` propagated from root command to all domain packages
 - `DockerRunner.Run(ctx, args...)` uses `exec.CommandContext` — kills child process on cancellation
-- **Ctrl+C behavior:** Signal handler prints `⚠️ Cancelled. Run megacenter deploy to retry.` via Presenter, then exits with code 130
+- **Ctrl+C behavior:** Signal handler prints `⚠️ Cancelled. Run volra deploy to retry.` via Presenter, then exits with code 130
 - Prevents zombie Docker processes when user interrupts a long build
 
 #### Command Summary Lines
@@ -603,7 +608,7 @@ Every command emits a final summary via `Result()` (stdout):
 | E102 | doctor | Docker is not running | Start Docker Desktop and try again |
 | E103 | doctor | Docker Compose V2 not available | Update Docker Desktop or install docker-compose-plugin |
 | E104 | doctor | Port {port} already in use | Stop the process using port {port} or change port in Agentfile |
-| E201 | setup | No Python project detected | MegaCenter requires requirements.txt or pyproject.toml |
+| E201 | setup | No Python project detected | Volra requires requirements.txt or pyproject.toml |
 | E202 | setup | No entry point found | Create main.py or specify in Agentfile |
 | E203 | setup | Agentfile already exists | Use --force to overwrite |
 | E301 | deploy | Docker is not running | Start Docker and try again |
@@ -611,10 +616,10 @@ Every command emits a final summary via `Result()` (stdout):
 | E303 | deploy | Health check failed after {timeout}s | Check agent starts on {port}{health_path}. Logs: docker logs {name}-agent-1 |
 | E304 | deploy | Agent container OOM killed | Increase Docker memory limit or optimize agent memory usage |
 | E305 | deploy | .env not found | Copy .env.example to .env and fill in values |
-| E401 | status | No deployment found | Run megacenter deploy first |
+| E401 | status | No deployment found | Run volra deploy first |
 | E402 | status | Docker not running | Start Docker and try again |
 | E501 | agentfile | Invalid field: {field} — {problem} | Field-specific fix instruction |
-| E502 | agentfile | Unsupported version {n} | Requires MegaCenter >= v{required}. Update: curl -sSL ... |
+| E502 | agentfile | Unsupported version {n} | Requires Volra >= v{required}. Update: curl -sSL ... |
 
 ### Category 3: Docker Compose & Dockerfile Generation
 
@@ -627,13 +632,13 @@ _4 rounds of Party Mode. 19 adjustments consolidated to 12 net decisions. Key: P
 | Prometheus | `prom/prometheus` | `v3.10.0` | Prometheus 3.x — breaking changes from 2.x don't affect basic scrape config |
 | Grafana | `grafana/grafana-oss` | `12.4.0` | OSS image (lighter, no enterprise features). NOT `grafana/grafana` |
 
-**Update strategy:** Versions are pinned in the Go binary's embedded templates. Updated with each MegaCenter release. No user-configurable version override in v0.1.
+**Update strategy:** Versions are pinned in the Go binary's embedded templates. Updated with each Volra release. No user-configurable version override in v0.1.
 
 #### docker-compose.yml Template
 
 ```yaml
-# .megacenter/docker-compose.yml — Generated by MegaCenter. Do not edit.
-# Regenerate with: megacenter deploy
+# .volra/docker-compose.yml — Generated by Volra. Do not edit.
+# Regenerate with: volra deploy
 
 name: {{.Name}}
 
@@ -641,7 +646,7 @@ services:
   agent:
     build:
       context: ..
-      dockerfile: .megacenter/Dockerfile
+      dockerfile: .volra/Dockerfile
     container_name: {{.Name}}-agent
     restart: unless-stopped
     ports:
@@ -651,7 +656,7 @@ services:
       - ../.env
     {{- end}}
     networks:
-      - megacenter
+      - volra
 
   prometheus:
     image: prom/prometheus:v3.10.0
@@ -668,7 +673,7 @@ services:
       - '--storage.tsdb.retention.time=7d'
       - '--storage.tsdb.retention.size=500MB'
     networks:
-      - megacenter
+      - volra
 
   grafana:
     image: grafana/grafana-oss:12.4.0
@@ -685,13 +690,13 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     networks:
-      - megacenter
+      - volra
 
 volumes:
   prometheus-data:
 
 networks:
-  megacenter:
+  volra:
     driver: bridge
 ```
 
@@ -699,9 +704,9 @@ networks:
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| **Network** | Dedicated bridge `megacenter` | Isolation. Services reference each other by service name (`http://agent:{{.Port}}`) |
-| **Project name** | `name: {{.Name}}` top-level (mandatory) | Without it, Compose uses directory name (`.megacenter`) — all projects would collide |
-| **Agent build context** | `..` (parent directory) | Dockerfile is in `.megacenter/`, agent code is in project root |
+| **Network** | Dedicated bridge `volra` | Isolation. Services reference each other by service name (`http://agent:{{.Port}}`) |
+| **Project name** | `name: {{.Name}}` top-level (mandatory) | Without it, Compose uses directory name (`.volra`) — all projects would collide |
+| **Agent build context** | `..` (parent directory) | Dockerfile is in `.volra/`, agent code is in project root |
 | **Agent ports** | `{{.Port}}:{{.Port}}` | Expose agent port for direct host access |
 | **Prometheus port** | `9090:9090` | Standard Prometheus port |
 | **Grafana port** | `3001:3000` | External 3001 avoids conflict with apps on 3000. Internal Grafana stays on 3000 |
@@ -726,14 +731,14 @@ No auto-remap in v0.1. Fixed ports = predictable setup.
 
 #### .dockerignore Generation
 
-Generated by `megacenter deploy` in the project root (NOT in `.megacenter/`) — `.dockerignore` is read relative to build context, which is `..` (project root).
+Generated by `volra deploy` in the project root (NOT in `.volra/`) — `.dockerignore` is read relative to build context, which is `..` (project root).
 
 **Rules:**
 - If `.dockerignore` already exists → respect it, do not modify
 - If not exists → generate with minimal set:
 
 ```
-.megacenter/
+.volra/
 .git/
 .env
 __pycache__/
@@ -751,7 +756,7 @@ Protects against slow builds from large `venv/` or `node_modules/` directories i
 The highest-risk generated artifact. Template is deliberately simple — two branches, three variables.
 
 ```dockerfile
-# Generated by MegaCenter. Override with dockerfile: custom in Agentfile.
+# Generated by Volra. Override with dockerfile: custom in Agentfile.
 FROM python:{{.PythonVersion}}-slim
 
 WORKDIR /app
@@ -775,24 +780,30 @@ CMD ["python", "{{.EntryPoint}}"]
 
 | Detected | Install Strategy | Layer Caching |
 |----------|-----------------|---------------|
-| `requirements.txt` exists | `COPY requirements.txt` → `pip install -r` → `COPY . .` | Optimized — deps cached until requirements.txt changes |
-| `pyproject.toml` only | `COPY . .` → `pip install .` | Not optimized — any file change re-installs. Pragmatic for v0.1, `dockerfile: custom` for optimization |
+| `requirements.txt` exists (pip) | `COPY requirements.txt` → `pip install --prefix=/install -r` → `COPY . .` | Optimized — deps cached until requirements.txt changes |
+| `pyproject.toml` only (pip) | `COPY . .` → `pip install --prefix=/install .` | Not optimized — any file change re-installs |
+| `poetry.lock` (poetry) | `pip install poetry` → `COPY pyproject.toml poetry.lock*` → `poetry install --only main --no-root` | Optimized — lockfile cached |
+| `uv.lock` (uv) | `COPY --from=ghcr.io/astral-sh/uv` → `COPY pyproject.toml uv.lock*` → `uv pip install --system --prefix=/install` | Optimized — lockfile cached, fast install |
+| `Pipfile.lock` (pipenv) | `pip install pipenv` → `COPY Pipfile Pipfile.lock*` → `pipenv install --deploy --system` | Optimized — lockfile cached |
 
-**Explicitly NOT supported in auto mode:** Poetry, uv, conda, pipenv. If detected, init emits warning: `⚠️ Poetry detected. Run 'poetry export -f requirements.txt -o requirements.txt' for optimal Docker builds, or use dockerfile: custom in Agentfile.`
+**Auto-detected by lockfile** (priority): `uv.lock` > `poetry.lock` > `Pipfile.lock` > `requirements.txt` > `pyproject.toml`. Override with `package_manager:` field in Agentfile.
+
+**Not supported:** conda. Use `dockerfile: custom` for conda environments.
 
 **ARM64 note:** `python:X.Y-slim` is multi-arch (Docker pulls correct variant automatically). If build fails due to C extension compilation on ARM64, error E302 includes hint: `Tip: Some Python packages lack ARM64 wheels. Try dockerfile: custom with --platform linux/amd64.`
 
 #### Template Context
 
-The Agentfile has 7 fields. The Dockerfile template needs 3 additional metadata fields detected at deploy time:
+The Agentfile has ~16 fields. The Dockerfile template needs additional metadata fields detected at deploy time:
 
 ```go
 // internal/deploy/context.go
 type TemplateContext struct {
-    agentfile.Agentfile          // Embedded — all 7 fields
-    PythonVersion   string       // Detected from pyproject.toml/runtime.txt, fallback "3.11"
+    agentfile.Agentfile          // Embedded — all fields
+    PythonVersion   string       // Detected from pyproject.toml, fallback "3.11"
     EntryPoint      string       // Detected from scanner (main.py/app.py/server.py), fallback "main.py"
-    HasRequirements bool         // requirements.txt exists in project root
+    PackageManager  string       // "pip", "poetry", "uv", "pipenv" — from Agentfile or auto-detected by lockfile
+    HasRequirements bool         // requirements.txt exists (used for pip branch)
 }
 ```
 
@@ -805,10 +816,10 @@ type TemplateContext struct {
 When Agentfile has `dockerfile: custom`:
 1. Deploy skips Dockerfile generation entirely
 2. Deploy reads `./Dockerfile` from project root (validated in Agentfile semantic validation — error if not found)
-3. Compose template uses `dockerfile: ../Dockerfile` instead of `.megacenter/Dockerfile`
+3. Compose template uses `dockerfile: ../Dockerfile` instead of `.volra/Dockerfile`
 4. All other generation proceeds normally (compose, prometheus, grafana)
 
-This is the escape hatch for: Poetry/uv projects, multi-stage builds, non-standard project structures, ARM64-specific builds, any case where auto-generated Dockerfile is insufficient.
+This is the escape hatch for: conda projects, multi-stage builds, non-standard project structures, ARM64-specific builds, any case where auto-generated Dockerfile is insufficient.
 
 ### Category 4: Prometheus & Grafana Configuration
 
@@ -823,14 +834,14 @@ const (
     JobHealth      = "agent-health"    // prometheus.yml, alert_rules.yml, dashboards
     JobMetrics     = "agent-metrics"   // prometheus.yml
     DatasourceName = "Prometheus"       // datasource.yml, dashboards
-    NetworkName    = "megacenter"       // docker-compose.yml
+    NetworkName    = "volra"       // docker-compose.yml
 )
 ```
 
 #### prometheus.yml Template
 
 ```yaml
-# .megacenter/prometheus.yml — Generated by MegaCenter. Do not edit.
+# .volra/prometheus.yml — Generated by Volra. Do not edit.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -879,7 +890,7 @@ scrape_configs:
 Lives in `static/`, copied without template processing. Uses Prometheus alerting template syntax `{{ $labels }}` which would conflict with Go template delimiters.
 
 ```yaml
-# .megacenter/alert_rules.yml — Generated by MegaCenter.
+# .volra/alert_rules.yml — Generated by Volra.
 groups:
   - name: agent-health
     rules:
@@ -923,7 +934,7 @@ Static — URL is always `http://prometheus:9090` (Docker service name within br
 ```yaml
 apiVersion: 1
 providers:
-  - name: 'MegaCenter'
+  - name: 'Volra'
     orgId: 1
     folder: ''
     type: file
@@ -1242,7 +1253,7 @@ if _, err := os.Stat(filepath.Join(dir, "requirements.txt")); err == nil {
 }
 ```
 
-**No atomic writes.** Generated artifacts are disposable — if a write fails mid-way, the user runs `megacenter deploy` again. Fix-and-re-run philosophy.
+**No atomic writes.** Generated artifacts are disposable — if a write fails mid-way, the user runs `volra deploy` again. Fix-and-re-run philosophy.
 
 **Respect existing files:** `deploy` generates `.dockerignore` only if one doesn't already exist. Uses `os.Stat` to check before writing.
 
@@ -1251,7 +1262,7 @@ if _, err := os.Stat(filepath.Join(dir, "requirements.txt")); err == nil {
 ```go
 // Template field names match Go struct fields exactly
 // TemplateContext.Name, TemplateContext.Port, TemplateContext.HealthPath
-const dockerComposeTemplate = `# Generated by MegaCenter — do not edit manually
+const dockerComposeTemplate = `# Generated by Volra — do not edit manually
 services:
   {{.Name}}:
     build: .
@@ -1265,7 +1276,7 @@ services:
 ```
 
 **Rules:**
-1. Generated file comment on first line: `# Generated by MegaCenter — do not edit manually`
+1. Generated file comment on first line: `# Generated by Volra — do not edit manually`
 2. Template field names = Go struct field names (no mapping layer)
 3. Use `{{- }}` and `{{ -}}` for whitespace control
 4. Templates are `go:embed` strings, not external files
@@ -1274,7 +1285,7 @@ services:
 ### Cobra Wiring Pattern
 
 ```go
-// cmd/megacenter/deploy.go — WIRING ONLY, zero business logic
+// cmd/volra/deploy.go — WIRING ONLY, zero business logic
 var deployCmd = &cobra.Command{
     Use:   "deploy",
     Short: "Deploy agent with monitoring stack",
@@ -1326,7 +1337,7 @@ func Run(ctx context.Context, dir string, p output.Presenter, r docker.DockerRun
 5. **No external dependencies beyond cobra, yaml.v3, testify** — stdlib for everything else
 6. **No `interface{}` / `any` in public APIs** — concrete types with validation
 7. **All `Run()` functions accept `context.Context` as first parameter** — Ctrl+C propagation
-8. **All generated files start with `# Generated by MegaCenter`** — user knows what's safe to delete
+8. **All generated files start with `# Generated by Volra`** — user knows what's safe to delete
 
 ---
 
@@ -1347,7 +1358,7 @@ _Autonomous Party Mode — 3 rounds to convergence. 11 adjustments consolidated.
 | User Output | `internal/output/` | NFR15, NFR22-23 | `presenter.go`, `mode.go`, `errors.go`, `format.go` |
 | Docker Abstraction | `internal/docker/` | Cross-cutting | `runner.go` |
 | Test Infrastructure | `internal/testutil/` | Cross-cutting | `golden.go`, `mocks.go` |
-| CLI Wiring | `cmd/megacenter/` | — | `main.go`, `doctor.go`, `deploy.go`, `init.go`, `status.go` |
+| CLI Wiring | `cmd/volra/` | — | `main.go`, `doctor.go`, `deploy.go`, `init.go`, `status.go` |
 | Build & Release | Root / `.github/` | FR38-FR41 | `Makefile`, `install.sh`, `ci.yml`, `release.yml` |
 
 ### Complete Project Directory Structure
@@ -1355,9 +1366,9 @@ _Autonomous Party Mode — 3 rounds to convergence. 11 adjustments consolidated.
 _This is the **definitive** project tree — supersedes the preliminary tree in Starter Template Evaluation (Step 3)._
 
 ```
-megacenter/
+volra/
 ├── cmd/
-│   └── megacenter/
+│   └── volra/
 │       ├── main.go                          # Root Cobra command, PersistentPreRunE, SilenceErrors/SilenceUsage
 │       ├── doctor.go                        # doctor subcommand wiring (3 lines in RunE)
 │       ├── deploy.go                        # deploy subcommand wiring
@@ -1503,8 +1514,8 @@ megacenter/
 │
 ├── install.sh                               # curl | sh installer — FR39 (detects OS/arch, downloads binary)
 ├── .golangci.yml                            # Linter rules (gofmt, govet, errcheck, staticcheck)
-├── .gitignore                               # /megacenter, /dist/, .megacenter/
-├── go.mod                                   # module github.com/antonioromero/megacenter
+├── .gitignore                               # /volra, /dist/, .volra/
+├── go.mod                                   # module github.com/romerox3/volra
 ├── go.sum
 ├── Makefile                                 # build, test, test-integration, lint, build-all, checksums
 ├── LICENSE                                  # MIT
@@ -1532,16 +1543,16 @@ Paths relative to the package directory. `deploy` is the sole consumer of templa
 
 ### Generated Output Structure (User's Agent Project)
 
-What MegaCenter generates in the user's project directory:
+What Volra generates in the user's project directory:
 
 ```
 my-agent/                                    # User's project root
-├── Agentfile                                # Created by `megacenter init`, persists across deploys
+├── Agentfile                                # Created by `volra init`, persists across deploys
 ├── .env                                     # Optional — user creates/manages, never generated
-├── .gitignore                               # Updated by `megacenter init` — adds .megacenter/ entry (FR14)
-├── .dockerignore                            # Generated by `megacenter deploy` (if not exists)
-│                                            # MUST exclude .megacenter/ from Docker build context
-├── .megacenter/                             # Generated by `megacenter deploy` — FULLY REGENERATED each time
+├── .gitignore                               # Updated by `volra init` — adds .volra/ entry (FR14)
+├── .dockerignore                            # Generated by `volra deploy` (if not exists)
+│                                            # MUST exclude .volra/ from Docker build context
+├── .volra/                             # Generated by `volra deploy` — FULLY REGENERATED each time
 │   ├── Dockerfile                           # From Dockerfile.tmpl
 │   ├── docker-compose.yml                   # From docker-compose.yml.tmpl
 │   ├── prometheus.yml                       # From prometheus.yml.tmpl
@@ -1555,18 +1566,18 @@ my-agent/                                    # User's project root
 │           │   └── dashboards.yml           # Copied from static/
 │           └── datasources/
 │               └── datasource.yml           # Copied from static/
-├── main.py                                  # User's agent code (untouched by MegaCenter)
+├── main.py                                  # User's agent code (untouched by Volra)
 ├── requirements.txt                         # User's dependencies (untouched)
 └── ...
 ```
 
-**Docker Compose invocation:** `docker compose -f .megacenter/docker-compose.yml -p {name} up -d`
+**Docker Compose invocation:** `docker compose -f .volra/docker-compose.yml -p {name} up -d`
 
-**Build context resolution:** `docker-compose.yml` uses `build: { context: .., dockerfile: .megacenter/Dockerfile }`. The `..` resolves to the project root (relative to the compose file in `.megacenter/`), so `COPY requirements.txt .` in the Dockerfile accesses user source files correctly.
+**Build context resolution:** `docker-compose.yml` uses `build: { context: .., dockerfile: .volra/Dockerfile }`. The `..` resolves to the project root (relative to the compose file in `.volra/`), so `COPY requirements.txt .` in the Dockerfile accesses user source files correctly.
 
 **`.dockerignore` contents** (generated by deploy if not exists):
 ```
-.megacenter/
+.volra/
 .git/
 .env
 __pycache__/
@@ -1576,7 +1587,7 @@ __pycache__/
 ### Package Dependency Graph
 
 ```
-cmd/megacenter/
+cmd/volra/
     ├── imports → internal/doctor/
     ├── imports → internal/setup/
     ├── imports → internal/deploy/
@@ -1613,7 +1624,7 @@ internal/testutil/   → imports internal/output/ + internal/docker/ (interfaces
 2. **Leaf packages** (`agentfile`, `output`, `docker`) import nothing internal — maximum reusability
 3. **`cmd/` is the sole assembly point** — creates instances and passes them to `Run()`
 
-### Data Flow: `megacenter deploy`
+### Data Flow: `volra deploy`
 
 ```
 cmd/deploy.go          internal/agentfile/        internal/deploy/            Docker
@@ -1629,7 +1640,7 @@ cmd/deploy.go          internal/agentfile/        internal/deploy/            Do
                               │                         ├── renderCompose()     │
                               │                         ├── renderPrometheus()  │
                               │                         ├── copyStaticFiles()   │
-                              │                         ├── writeAll(.megacenter/)│
+                              │                         ├── writeAll(.volra/)│
                               │                         ├── r.Run("compose",...) ──► docker compose up
                               │                         │◄─── output ──────────┤
                               │                         ├── healthCheck()        ──► HTTP GET /health
@@ -1656,7 +1667,7 @@ cmd/deploy.go          internal/agentfile/        internal/deploy/            Do
 ### Makefile
 
 ```makefile
-BINARY    := megacenter
+BINARY    := volra
 VERSION   := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS   := -s -w -X main.version=$(VERSION)
 # Ubuntu AMD64 and Debian AMD64 share linux/amd64 binary (2 combos = 3 PRD targets)
@@ -1665,7 +1676,7 @@ PLATFORMS := darwin/arm64 linux/amd64
 .PHONY: build test test-integration lint build-all checksums clean
 
 build:               ## Build for current platform
-	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/megacenter/
+	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/volra/
 
 test:                ## Run unit tests (no Docker required)
 	go test ./internal/... -v -count=1
@@ -1680,7 +1691,7 @@ build-all:           ## Cross-compile for all platforms
 	@for platform in $(PLATFORMS); do \
 		os=$${platform%/*}; arch=$${platform#*/}; \
 		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch \
-		go build -ldflags "$(LDFLAGS)" -o dist/$(BINARY)-$$os-$$arch ./cmd/megacenter/; \
+		go build -ldflags "$(LDFLAGS)" -o dist/$(BINARY)-$$os-$$arch ./cmd/volra/; \
 	done
 
 checksums:           ## Generate SHA256 checksums
@@ -1700,7 +1711,7 @@ clean:               ## Remove build artifacts
 | No Docker SDK | `go.mod` inspection | Only cobra, yaml.v3, testify in dependencies |
 | DAG dependency graph | Go compiler | Circular imports = build failure |
 | Template/static encapsulation | `go:embed` in `deploy/` only | No other package references template/static paths |
-| Generated files marked | Template content | First line: `# Generated by MegaCenter` |
+| Generated files marked | Template content | First line: `# Generated by Volra` |
 
 ### Corrections from Previous Steps
 
@@ -1736,7 +1747,7 @@ _Autonomous Party Mode — 3 rounds to convergence. 12 adjustments. 1 critical b
 - 9 packages match 1:1 with the dependency DAG — Go compiler enforces no cycles
 - templates/ and static/ inside `internal/deploy/` — sole consumer, package-local `go:embed`
 - testdata/ per package — Go convention, `go build` ignores them
-- Generated output in `.megacenter/` — isolated from user code, fully regenerated per deploy
+- Generated output in `.volra/` — isolated from user code, fully regenerated per deploy
 
 ### Requirements Coverage ✅
 
@@ -1807,7 +1818,7 @@ _When a later step contradicts an earlier step, this table is the authoritative 
 Files added during validation that were missing from the Step 6 tree:
 
 ```
-megacenter/
+volra/
 ├── CONTRIBUTING.md                          # PR rules, conventional commits, tests required
 ├── .github/
 │   ├── ISSUE_TEMPLATE/
@@ -1853,7 +1864,7 @@ megacenter/
 **✅ Project Structure (Step 6)**
 - [x] Complete directory tree with all files described
 - [x] Package dependency DAG verified
-- [x] Generated output structure (.megacenter/) documented
+- [x] Generated output structure (.volra/) documented
 - [x] Embed strategy defined (package-local go:embed)
 - [x] CI/CD pipeline structure specified
 - [x] Makefile with all targets
@@ -1905,4 +1916,1052 @@ megacenter/
 7. `internal/setup/` — second command, creates Agentfile
 8. `internal/deploy/` — largest package, highest risk, leave for last
 9. `internal/status/` — read-only, depends on deploy working
-10. `cmd/megacenter/` — Cobra wiring, assembled last
+10. `cmd/volra/` — Cobra wiring, assembled last
+
+---
+
+## v1.1 Architecture Extension
+
+_Mode: EXTEND. Existing architecture is preserved. This section adds new decisions and patterns for v1.1 features (FR42-FR44). Discovered during E2E testing with 8 agent systems of increasing complexity._
+
+### Extension 1: Configurable Health Timeout (FR42)
+
+#### Agentfile Schema Addition
+
+```yaml
+# Agentfile — v1.1 optional field
+version: 1
+name: my-ml-agent
+framework: generic
+port: 8000
+health_path: /health
+health_timeout: 300        # NEW — optional, seconds, default 60
+env:
+  - OPENAI_API_KEY
+dockerfile: auto
+```
+
+| Field | Type | Required | Default | Validation |
+|-------|------|----------|---------|-----------|
+| `health_timeout` | integer | No | `60` | Range: 10-600 seconds. Must be > 0. Zero value means "use default (60s)" |
+
+**Backward compatibility:** Field is optional with `yaml:"health_timeout,omitempty"`. Agentfiles without this field get the current 60s default behavior. Zero value in Go (0) maps to the default — no behavior change for existing users.
+
+#### Go Type Changes
+
+```go
+// internal/agentfile/agentfile.go — extended
+type Agentfile struct {
+    Version       int            `yaml:"version"`
+    Name          string         `yaml:"name"`
+    Framework     Framework      `yaml:"framework"`
+    Port          int            `yaml:"port"`
+    HealthPath    string         `yaml:"health_path"`
+    HealthTimeout int            `yaml:"health_timeout,omitempty"` // NEW: seconds, 0 = default 60
+    Env           []string       `yaml:"env,omitempty"`
+    Dockerfile    DockerfileMode `yaml:"dockerfile"`
+}
+```
+
+#### Validation Rules
+
+```go
+// internal/agentfile/validate.go — new function
+func validateHealthTimeout(timeout int) error {
+    if timeout == 0 {
+        return nil // default, not specified
+    }
+    if timeout < 10 || timeout > 600 {
+        return &output.UserError{
+            Code: output.CodeInvalidAgentfile,
+            What: fmt.Sprintf("Invalid field: health_timeout — %d is out of range (10-600)", timeout),
+            Fix:  "Set health_timeout between 10 and 600 seconds, or remove the field for default (60s)",
+        }
+    }
+    return nil
+}
+```
+
+#### Health Check Propagation
+
+```go
+// internal/deploy/healthcheck.go — updated
+const (
+    healthRetryInterval = 2 * time.Second
+    defaultHealthTimeout = 60 * time.Second
+)
+
+// WaitForHealth now accepts configurable timeout.
+func WaitForHealth(ctx context.Context, port int, healthPath string, name string, timeout time.Duration, p output.Presenter) error {
+    if timeout == 0 {
+        timeout = defaultHealthTimeout
+    }
+    deadline := time.Now().Add(timeout)
+    // ... rest unchanged
+}
+```
+
+**Caller change in deploy.go:**
+
+```go
+// Resolve timeout: Agentfile value → default
+healthTimeout := time.Duration(af.HealthTimeout) * time.Second
+if err := WaitForHealth(ctx, af.Port, af.HealthPath, af.Name, healthTimeout, p); err != nil {
+    return err
+}
+```
+
+#### Docker Compose Health Check
+
+The `health_timeout` also propagates to the Docker Compose agent service healthcheck:
+
+```yaml
+# docker-compose.yml.tmpl — agent service addition
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:{{.Port}}{{.HealthPath}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: {{.HealthTimeoutStr}}
+```
+
+Where `HealthTimeoutStr` is computed from the Agentfile's `health_timeout` (default: "60s").
+
+### Extension 2: Multi-Stage Dockerfile Builds (FR43)
+
+#### Template Redesign
+
+The current single-stage Dockerfile template is replaced with a multi-stage pattern:
+
+```dockerfile
+# Generated by Volra — override with dockerfile: custom in Agentfile
+# Stage 1: Builder
+FROM python:{{.PythonVersion}}-slim AS builder
+
+WORKDIR /build
+
+{{if .HasRequirements -}}
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --prefix=/install -r requirements.txt
+{{- else -}}
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --prefix=/install .
+{{- end}}
+
+# Stage 2: Runtime
+FROM python:{{.PythonVersion}}-slim
+
+WORKDIR /app
+
+COPY --from=builder /install /usr/local
+
+{{if .HasRequirements -}}
+COPY . .
+{{- else -}}
+COPY . .
+{{- end}}
+
+EXPOSE {{.Port}}
+
+CMD ["python", "{{.EntryPoint}}"]
+```
+
+**Key improvements:**
+- Builder stage installs dependencies, runtime stage only copies results
+- `--mount=type=cache,target=/root/.cache/pip` enables pip cache across builds (BuildKit required)
+- `--prefix=/install` installs to a clean directory for selective copy
+- Final image contains only runtime dependencies, not build tools
+- Image size reduction: typically 40-60% smaller
+
+**BuildKit requirement:** The `--mount=type=cache` syntax requires BuildKit. Docker 23.0+ uses BuildKit by default. For older versions, set `DOCKER_BUILDKIT=1`. The `doctor` command already checks Docker version.
+
+**No TemplateContext changes needed** — the same 3 metadata fields (PythonVersion, EntryPoint, HasRequirements) drive the new template.
+
+### Extension 3: Custom Metrics Dashboard Panels (FR44)
+
+#### Detection Strategy
+
+At deploy time, `BuildContext` checks whether the agent project uses `prometheus_client`:
+
+```go
+// internal/deploy/context.go — extended
+type TemplateContext struct {
+    agentfile.Agentfile
+    PythonVersion   string
+    EntryPoint      string
+    HasRequirements bool
+    HasMetrics      bool   // NEW: true if prometheus_client detected in dependencies
+}
+```
+
+Detection logic:
+1. Check `requirements.txt` for `prometheus_client` or `prometheus-client`
+2. Check `pyproject.toml` for the same in `[project.dependencies]` or `[tool.poetry.dependencies]`
+
+```go
+// internal/deploy/context.go
+func detectMetricsLibrary(dir string) bool {
+    // Check requirements.txt
+    if data, err := os.ReadFile(filepath.Join(dir, "requirements.txt")); err == nil {
+        content := strings.ToLower(string(data))
+        if strings.Contains(content, "prometheus_client") || strings.Contains(content, "prometheus-client") {
+            return true
+        }
+    }
+    // Check pyproject.toml
+    if data, err := os.ReadFile(filepath.Join(dir, "pyproject.toml")); err == nil {
+        content := strings.ToLower(string(data))
+        if strings.Contains(content, "prometheus_client") || strings.Contains(content, "prometheus-client") {
+            return true
+        }
+    }
+    return false
+}
+```
+
+#### Dashboard Architecture Decision
+
+**Decision: Dashboards remain static JSON files, but we add conditional panels.**
+
+The key architectural question was: should dashboards become templates (.json.tmpl)?
+
+**Answer: No.** Grafana JSON is deeply nested and not template-friendly. Instead:
+- Keep `overview.json` and `detail.json` as static files
+- Add `overview_metrics.json` and `detail_metrics.json` as alternative static files with additional custom metrics panels
+- At deploy time, copy the appropriate variant based on `HasMetrics`
+
+This avoids template complexity while supporting both scenarios:
+
+```go
+// internal/deploy/grafana.go — updated selection logic
+func selectDashboard(name string, hasMetrics bool) string {
+    if hasMetrics {
+        return "static/" + name + "_metrics.json"
+    }
+    return "static/" + name + ".json"
+}
+```
+
+#### Custom Metrics Panels
+
+When `HasMetrics` is true, the dashboards include additional panels:
+
+**Overview (overview_metrics.json) — 2 additional panels:**
+
+| Panel | Type | PromQL | Notes |
+|-------|------|--------|-------|
+| Request Rate | Stat | `sum(rate(http_requests_total{job="agent-metrics"}[5m]))` | Requests per second (common prometheus_client metric) |
+| Active Requests | Stat | `sum(http_requests_in_progress{job="agent-metrics"})` | Currently processing |
+
+**Detail (detail_metrics.json) — 3 additional panels:**
+
+| Panel | Type | PromQL | Notes |
+|-------|------|--------|-------|
+| Request Rate Over Time | Time series | `sum(rate(http_requests_total{job="agent-metrics"}[5m]))` | Line chart |
+| Request Duration | Time series | `histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="agent-metrics"}[5m]))` | P95 latency |
+| Custom Metrics | Table | `{job="agent-metrics", __name__!~"http_.*\|process_.*\|python_.*"}` | Any non-standard metrics from the agent |
+
+**Panel descriptions clearly indicate:** "Application-reported metric — requires prometheus_client instrumentation in agent code."
+
+#### Prometheus Configuration
+
+The existing `prometheus.yml.tmpl` already has an `agent-metrics` job that scrapes `/metrics`. No changes needed — it always scrapes, and if no `/metrics` endpoint exists, it silently gets 404s (by design).
+
+### v1.1 Test Strategy
+
+#### New Test Fixtures
+
+```
+internal/agentfile/testdata/
+  valid_health_timeout.yaml       # version: 1, health_timeout: 300
+  valid_no_health_timeout.yaml    # version: 1, no health_timeout field (backward compat)
+  invalid_health_timeout_low.yaml # health_timeout: 5 (below 10)
+  invalid_health_timeout_high.yaml # health_timeout: 700 (above 600)
+```
+
+#### Golden File Updates
+
+All existing golden files are regenerated with the new multi-stage Dockerfile template. New golden files added:
+
+```
+internal/deploy/testdata/golden/
+  dockerfile_requirements.golden    # UPDATED: multi-stage with requirements.txt
+  dockerfile_pyproject.golden       # UPDATED: multi-stage with pyproject.toml
+  compose_minimal.golden            # UNCHANGED (health_timeout is optional)
+  compose_health_timeout.golden     # NEW: with custom health_timeout
+```
+
+#### Key Test Cases
+
+1. **Backward compatibility:** Existing v1.0 Agentfile fixtures parse without errors, health_timeout defaults to 0 (→ 60s behavior)
+2. **Health timeout validation:** Out-of-range values rejected, zero allowed, boundary values (10, 600) accepted
+3. **Multi-stage Dockerfile:** Golden file comparison for both requirements.txt and pyproject.toml paths
+4. **HasMetrics detection:** Positive/negative cases for requirements.txt and pyproject.toml
+5. **Dashboard selection:** Correct JSON file copied based on HasMetrics flag
+
+---
+
+## v1.2 Architecture Extension
+
+_Mode: EXTEND. This section adds decisions and patterns for v1.2 features (FR45-FR46). Builds on v1.1 architecture — all existing patterns preserved._
+
+### Extension 4: Persistent Volume Mounts (FR45)
+
+#### Agentfile Schema Addition
+
+```yaml
+# Agentfile — v1.2 optional field
+version: 1
+name: my-ml-agent
+framework: generic
+port: 8000
+health_path: /health
+health_timeout: 300
+volumes:                   # NEW — optional, list of absolute paths
+  - /data
+  - /models
+env:
+  - OPENAI_API_KEY
+dockerfile: auto
+```
+
+| Field | Type | Required | Default | Validation |
+|-------|------|----------|---------|-----------|
+| `volumes` | list of strings | No | `[]` | Each path absolute (starts with `/`), no duplicates, no `/app` or `/app/*` (conflicts with WORKDIR), max 10 entries |
+
+**Backward compatibility:** Field is optional with `yaml:"volumes,omitempty"`. Agentfiles without this field produce identical output to v1.0/v1.1.
+
+#### Go Type Changes
+
+```go
+// internal/agentfile/agentfile.go — extended
+type Agentfile struct {
+    Version       int            `yaml:"version"`
+    Name          string         `yaml:"name"`
+    Framework     Framework      `yaml:"framework"`
+    Port          int            `yaml:"port"`
+    HealthPath    string         `yaml:"health_path"`
+    HealthTimeout int            `yaml:"health_timeout,omitempty"`
+    Volumes       []string       `yaml:"volumes,omitempty"` // NEW: absolute mount paths
+    Env           []string       `yaml:"env,omitempty"`
+    Dockerfile    DockerfileMode `yaml:"dockerfile"`
+}
+```
+
+#### Validation Rules
+
+```go
+// internal/agentfile/validate.go — new function
+func validateVolumes(volumes []string) error {
+    if len(volumes) > 10 {
+        return &output.UserError{
+            Code: output.CodeInvalidAgentfile,
+            What: "Invalid field: volumes — too many entries (max 10)",
+            Fix:  "Reduce the number of volume mounts to 10 or fewer",
+        }
+    }
+    seen := make(map[string]bool)
+    for _, v := range volumes {
+        if v == "" {
+            return error: "empty entry"
+        }
+        if !strings.HasPrefix(v, "/") {
+            return error: "must be absolute path"
+        }
+        if v == "/app" || strings.HasPrefix(v, "/app/") {
+            return error: "conflicts with container WORKDIR /app"
+        }
+        if seen[v] {
+            return error: "duplicate"
+        }
+        seen[v] = true
+    }
+    return nil
+}
+```
+
+#### TemplateContext Extension
+
+```go
+// internal/deploy/context.go — new type
+type VolumeSpec struct {
+    Name      string // Docker named volume, e.g., "my-agent-data"
+    MountPath string // Container mount path, e.g., "/data"
+}
+
+// TemplateContext extended
+type TemplateContext struct {
+    agentfile.Agentfile
+    PythonVersion   string
+    EntryPoint      string
+    HasRequirements bool
+    HasMetrics      bool
+    VolumeSpecs     []VolumeSpec // NEW: computed from Volumes + Name
+}
+```
+
+Volume name generation: `{agent-name}-{sanitized-path}` where the path is cleaned of leading `/` and `/` replaced with `-`. Example: volume `/data/models` on agent `my-agent` → `my-agent-data-models`.
+
+#### Docker Compose Template Changes
+
+```yaml
+# docker-compose.yml.tmpl — agent service addition
+services:
+  agent:
+    # ... existing fields ...
+    {{- if .VolumeSpecs}}
+    volumes:
+      {{- range .VolumeSpecs}}
+      - {{.Name}}:{{.MountPath}}
+      {{- end}}
+    {{- end}}
+
+# Top-level volumes (extend existing)
+volumes:
+  prometheus-data:
+  {{- range .VolumeSpecs}}
+  {{.Name}}:
+  {{- end}}
+```
+
+#### Architecture Decision: Simple Path List vs Named Map
+
+**Decision:** Simple path list (`[]string`) for v1.2. Named map (`map[string]string`) deferred to v2.0 if needed.
+
+**Rationale:** (1) Covers 80% use case — "I want /data to persist". (2) Volume naming is deterministic from agent name + path. (3) Aligns with YAGNI — no evidence users need custom volume names. (4) If v2.0 introduces `services` with `volumes` on service containers, the map format may be needed then.
+
+#### Architecture Decision: Block /app Paths
+
+**Decision:** Reject any volume path that is `/app` or starts with `/app/`.
+
+**Rationale:** Docker volumes mount at container start, AFTER the image is built. A volume on `/app` would shadow the `COPY . .` content, meaning the agent code would be invisible. This is a silent, hard-to-debug failure. Blocking it at validation prevents the issue entirely.
+
+### Extension 5: LLM Token Tracking Panels (FR46)
+
+#### Strategy: Extend Existing Dashboard Variants
+
+**Decision:** Add LLM-specific panels to the existing `overview_metrics.json` and `detail_metrics.json` files. No new dashboard files or detection mechanisms.
+
+**Rationale:** (1) Build-time detection cannot determine which metrics an agent exposes — only that it uses prometheus_client. (2) Grafana handles missing metrics gracefully ("No data" display). (3) Eliminates need for HasLLMMetrics boolean, new file variants, and combinatorial explosion. (4) Party Mode convergence: simpler is better.
+
+#### Volra LLM Metrics Convention
+
+Recommended metric names for AI/LLM agents. These are documented conventions, not enforced requirements:
+
+| Metric Name | Type | Labels | Description |
+|-------------|------|--------|-------------|
+| `llm_tokens_total` | Counter | `direction` (input\|output), `model` | Total tokens processed |
+| `llm_request_cost_dollars_total` | Counter | `model` | Cumulative cost in USD |
+| `llm_model_requests_total` | Counter | `model` | Requests per model |
+
+Agents that expose these metrics automatically benefit from dedicated dashboard panels. Agents that don't expose them see "No data" in those panels — no errors, no configuration needed.
+
+#### Dashboard Panel Additions
+
+**overview_metrics.json** — 1 new panel (total: 6):
+
+| Panel | Type | PromQL | Notes |
+|-------|------|--------|-------|
+| LLM Token Rate | stat | `sum(rate(llm_tokens_total{job="agent-metrics"}[5m]))` | Tokens per second, both directions |
+
+**detail_metrics.json** — 3 new panels (total: 10):
+
+| Panel | Type | PromQL | Notes |
+|-------|------|--------|-------|
+| Token Consumption Over Time | timeseries | `sum(rate(llm_tokens_total{job="agent-metrics"}[5m])) by (direction)` | Input vs output token rates |
+| LLM Cost Trending | timeseries | `sum(increase(llm_request_cost_dollars_total{job="agent-metrics"}[1h]))` | Hourly cost accumulation |
+| Per-Model Request Breakdown | bargauge | `sum(rate(llm_model_requests_total{job="agent-metrics"}[5m])) by (model)` | Model comparison |
+
+All LLM panels include description: `"Volra LLM Metrics Convention — shows 'No data' if agent does not expose this metric"`
+
+#### Files Changed
+
+**Story 7.1 (Volumes):**
+- `internal/agentfile/agentfile.go` — add `Volumes []string` field
+- `internal/agentfile/validate.go` — add `validateVolumes()`
+- `internal/deploy/context.go` — add `VolumeSpec` type, compute in `BuildContext`
+- `internal/deploy/templates/docker-compose.yml.tmpl` — conditional volumes
+- New test fixtures: `valid_volumes.yaml`, `invalid_volumes_not_absolute.yaml`, `invalid_volumes_app_path.yaml`, `invalid_volumes_duplicate.yaml`
+- New golden file: `compose_volumes.golden`
+
+**Story 7.2 (LLM Panels):**
+- `internal/deploy/static/overview_metrics.json` — add 1 LLM panel
+- `internal/deploy/static/detail_metrics.json` — add 3 LLM panels
+- `internal/deploy/grafana_test.go` — extend metrics tests for LLM panels
+
+### v1.2 Test Strategy
+
+#### New Test Fixtures
+
+```
+internal/agentfile/testdata/
+  valid_volumes.yaml                # volumes: [/data, /models]
+  invalid_volumes_not_absolute.yaml # volumes: [data] (no leading /)
+  invalid_volumes_app_path.yaml     # volumes: [/app/data] (conflicts with WORKDIR)
+  invalid_volumes_duplicate.yaml    # volumes: [/data, /data]
+```
+
+#### Golden File Updates
+
+```
+internal/deploy/testdata/golden/
+  compose_volumes.golden            # NEW: with agent volumes + top-level declarations
+```
+
+#### Key Test Cases
+
+1. **Volumes validation:** Absolute path required, /app blocked, no duplicates, max 10, empty list OK
+2. **VolumeSpec computation:** Name generation from agent name + path sanitization
+3. **Docker Compose volumes:** Golden file with volumes, existing golden files unchanged (backward compat)
+4. **LLM dashboard panels:** Assert new panels present in overview_metrics.json and detail_metrics.json
+5. **Backward compatibility:** v1.0/v1.1 Agentfile fixtures parse without errors, Volumes defaults to nil
+
+---
+
+## v2.0 Architecture Extension
+
+_Mode: EXTEND. This section adds new decisions and patterns for v2.0 features (FR47, FR48, FR50). FR49 (streaming probes) is DEFERRED. Schema version remains 1._
+
+### Extension 6: Infrastructure Services (FR47)
+
+#### Schema Design
+
+**ADR: Services use `map[string]Service` — explicit definitions, no presets**
+
+Users specify exactly what services they need. No magic presets. The map key is the service name.
+
+```yaml
+# Agentfile — v2.0 optional field
+version: 1
+name: my-agent
+framework: generic
+port: 8000
+health_path: /health
+services:                          # NEW — optional, map of service definitions
+  redis:
+    image: redis:7-alpine
+  db:
+    image: postgres:16
+    port: 5432
+    volumes:
+      - /var/lib/postgresql/data
+    env:
+      - POSTGRES_PASSWORD
+```
+
+#### Go Types
+
+```go
+// Service represents an infrastructure service declared in the Agentfile.
+type Service struct {
+    Image   string   `yaml:"image"`
+    Port    int      `yaml:"port,omitempty"`    // 0 = internal only (no host port)
+    Volumes []string `yaml:"volumes,omitempty"` // absolute paths, same rules as agent volumes (except /app check)
+    Env     []string `yaml:"env,omitempty"`     // env var names, values from .env file
+}
+
+// In Agentfile struct:
+Services map[string]Service `yaml:"services,omitempty"`
+```
+
+**ADR: ServiceContext sorted by name for deterministic compose output**
+
+Go map iteration is non-deterministic. ServiceContexts must be sorted by name to ensure golden file tests are stable.
+
+```go
+// ServiceContext is the pre-computed deploy-time representation of a Service.
+type ServiceContext struct {
+    Name        string       // map key, used as compose service name suffix
+    Image       string
+    Port        int
+    Env         []string
+    VolumeSpecs []VolumeSpec // computed from agentName + serviceName + volume paths
+}
+
+// In TemplateContext:
+ServiceContexts []ServiceContext
+```
+
+#### Validation Rules
+
+```go
+func validateServices(services map[string]Service, agentPort int) error
+```
+
+1. Max 5 services
+2. Service name: must match `dnsLabelRegex` (reuse from name validation)
+3. Reserved names blocked: `agent`, `prometheus`, `grafana`, `blackbox`
+4. Image: required, non-empty
+5. Port: 0-65535. Must not conflict with agent port, 9090 (prometheus), 3001 (grafana)
+6. Port uniqueness across all services
+7. Volumes: reuse volume path validation (absolute, no dupes within service)
+8. Env: reuse env validation (non-empty, no dupes within service)
+
+#### Docker Compose Template Changes
+
+Services are inserted between agent and blackbox in the compose template:
+
+```yaml
+{{- range .ServiceContexts}}
+  {{$.Agentfile.Name}}-{{.Name}}:
+    image: {{.Image}}
+    container_name: {{$.Agentfile.Name}}-{{.Name}}
+    restart: unless-stopped
+{{- if .Port}}
+    ports:
+      - "{{.Port}}:{{.Port}}"
+{{- end}}
+{{- if .Env}}
+    env_file:
+      - ../.env
+{{- end}}
+{{- if .VolumeSpecs}}
+    volumes:
+{{- range .VolumeSpecs}}
+      - {{.Name}}:{{.MountPath}}
+{{- end}}
+{{- end}}
+    networks:
+      - volra
+{{- end}}
+```
+
+Agent service gets `depends_on` for all declared services:
+
+```yaml
+{{- if .ServiceContexts}}
+    depends_on:
+{{- range .ServiceContexts}}
+      - {{$.Agentfile.Name}}-{{.Name}}
+{{- end}}
+{{- end}}
+```
+
+Service volumes are added to the top-level volumes section alongside agent and prometheus volumes.
+
+#### Volume Naming Convention
+
+Service volumes follow: `{projectName}-{serviceName}-{sanitized-path}`
+
+Example: project "my-agent", service "db", path "/var/lib/postgresql/data" → `my-agent-db-var-lib-postgresql-data`
+
+Uses same sanitization as agent volumes (TrimPrefix "/", ReplaceAll "/" → "-").
+
+#### Test Strategy
+
+```
+internal/agentfile/testdata/
+  valid_services.yaml              # services with redis + postgres
+  invalid_services_reserved.yaml   # service name "agent" (reserved)
+  invalid_services_no_image.yaml   # service without image field
+  invalid_services_port_conflict.yaml  # service port same as agent
+  invalid_services_too_many.yaml   # 6 services (max 5)
+```
+
+Golden file: `compose_services.golden` — compose output with 2 services
+
+### Extension 7: Container Runtime Configuration (FR48 + FR50)
+
+#### Security Context (FR48)
+
+```yaml
+# Agentfile — v2.0 optional field
+version: 1
+name: my-agent
+framework: generic
+port: 8000
+health_path: /health
+security:                          # NEW — optional
+  read_only: true
+  no_new_privileges: true
+  drop_capabilities: [ALL]
+```
+
+```go
+type SecurityContext struct {
+    ReadOnly         bool     `yaml:"read_only,omitempty"`
+    NoNewPrivileges  bool     `yaml:"no_new_privileges,omitempty"`
+    DropCapabilities []string `yaml:"drop_capabilities,omitempty"`
+}
+
+// In Agentfile struct — pointer for nil check:
+Security *SecurityContext `yaml:"security,omitempty"`
+```
+
+Docker Compose mapping:
+```yaml
+{{- if .Security}}
+{{- if .Security.ReadOnly}}
+    read_only: true
+{{- end}}
+{{- if .Security.NoNewPrivileges}}
+    security_opt:
+      - no-new-privileges:true
+{{- end}}
+{{- if .Security.DropCapabilities}}
+    cap_drop:
+{{- range .Security.DropCapabilities}}
+      - {{.}}
+{{- end}}
+{{- end}}
+{{- end}}
+```
+
+Validation: minimal. Docker validates capabilities at runtime. No Agentfile-level validation of capability names.
+
+#### GPU/Hardware Acceleration (FR50)
+
+**ADR: GPU field is boolean, defaults to nvidia driver**
+
+Only nvidia-container-toolkit is mature for Docker. AMD ROCm support is experimental. Simple boolean avoids premature abstraction.
+
+```yaml
+gpu: true   # NEW — optional, default false
+```
+
+```go
+// In Agentfile struct:
+GPU bool `yaml:"gpu,omitempty"`
+```
+
+Docker Compose:
+```yaml
+{{- if .GPU}}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+{{- end}}
+```
+
+Validation: none. Boolean field.
+
+Testing: template-only verification (can't E2E test without GPU hardware). Assert compose output contains `nvidia` and `capabilities: [gpu]`.
+
+#### Test Fixtures
+
+```
+internal/agentfile/testdata/
+  valid_security.yaml    # security with all 3 fields
+  valid_gpu.yaml         # gpu: true
+```
+
+#### Field Count Summary
+
+After v2.0: 12 Agentfile fields (version, name, framework, port, health_path, health_timeout, volumes, env, dockerfile, services, security, gpu)
+
+#### Backward Compatibility
+
+All v1.0, v1.1, and v1.2 Agentfile fixtures MUST parse without errors with the v2.0 CLI. New fields default to zero values (nil maps, nil pointers, false booleans)
+
+## v0.2 Architecture Extensions (Post-Market-Research Strategic Pivot)
+
+*Added March 2026 after market research revealing Railway ($100M), Vercel AI Platform, and Aegra as competitors. These extensions implement the "Own your agent infrastructure" differentiation strategy. Designed via Party Mode (Lisa/Frink/Homer) with sequential thinking consensus.*
+
+### Extension 8: Agent Observability Level 2
+
+**ADR: Prometheus-native over OpenTelemetry for v0.2**
+
+OpenTelemetry is the industry standard for traces but adds heavy dependencies (Go SDK + trace storage backend like Jaeger/Tempo + additional containers). For v0.2, Prometheus-native metrics deliver the key insights (token count, cost, latency) without new infrastructure. Migration to OpenTelemetry is a v0.3+ consideration.
+
+**ADR: Framework-agnostic instrumentation over framework-specific hooks**
+
+Volra's core differentiator is being framework-agnostic. Level 2 observability MUST work with any Python agent, not just LangGraph. Instrumentation targets LLM provider SDKs (OpenAI, Anthropic, etc.) rather than agent framework internals. Optional framework-specific addons (LangGraph graph metrics, CrewAI crew metrics) are deferred to v0.3.
+
+**New Agentfile Field: `observability`**
+
+```yaml
+# Agentfile
+observability:         # NEW — optional, entire struct
+  level: 2             # 1 (default) = probe only, 2 = LLM metrics
+  metrics_port: 9101   # default 9101, port for metrics endpoint
+```
+
+```go
+type ObservabilityConfig struct {
+    Level       int `yaml:"level,omitempty"`        // 1 or 2, default 1
+    MetricsPort int `yaml:"metrics_port,omitempty"` // default 9101
+}
+
+type Agentfile struct {
+    // ... existing fields ...
+    Observability *ObservabilityConfig `yaml:"observability,omitempty"` // NEW
+}
+```
+
+Validation:
+- `level` must be 1 or 2. Default: 1.
+- `metrics_port` must be valid port range (1-65535). Default: 9101.
+- `level: 2` is valid with ANY framework (generic or langgraph). No framework constraint.
+
+**New Python Package: `volra-observe`**
+
+Separate repository. PyPI distribution. Works with any Python agent that makes LLM calls:
+
+```python
+# Option 1: Automatic instrumentation (patches OpenAI/Anthropic SDKs)
+import volra_observe
+volra_observe.init(port=9101)  # starts Prometheus HTTP server, patches LLM SDKs
+
+# Option 2: Decorator for manual instrumentation
+from volra_observe import track_llm
+
+@track_llm(model="gpt-4o")
+def call_llm(prompt: str) -> str:
+    return openai_client.chat.completions.create(...)
+
+# Option 3: Context manager
+from volra_observe import llm_context
+
+with llm_context(model="claude-sonnet-4-20250514"):
+    response = anthropic_client.messages.create(...)
+```
+
+Core metrics exposed on `:9101/metrics` (framework-agnostic):
+- `volra_llm_tokens_total{model, direction}` — token count (input/output)
+- `volra_llm_cost_dollars_total{model}` — estimated cost (embedded pricing table)
+- `volra_llm_request_duration_seconds{model, status}` — LLM call latency histogram
+- `volra_llm_errors_total{model, error_type}` — errors by type (rate_limit, timeout, api_error)
+- `volra_tool_calls_total{tool_name}` — tool/function call count
+
+Cost calculation uses embedded pricing table:
+```python
+COST_PER_1K_TOKENS = {
+    "gpt-4o": {"input": 0.005, "output": 0.015},
+    "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
+    "claude-sonnet-4-20250514": {"input": 0.003, "output": 0.015},
+    "claude-haiku-4-5-20251001": {"input": 0.0008, "output": 0.004},
+}
+```
+Table updated with each package release. Override via `~/.volra/pricing.json` deferred to v0.3.
+
+**SDK Instrumentation Strategy:**
+
+Auto-patching targets (v0.2):
+- `openai` Python SDK — patch `chat.completions.create()` and `completions.create()`
+- `anthropic` Python SDK — patch `messages.create()`
+
+Auto-patching targets (v0.3+):
+- `google-generativeai` — Gemini
+- `litellm` — unified proxy (covers 100+ providers)
+- LangGraph callback handler (framework-specific addon)
+- CrewAI telemetry hook (framework-specific addon)
+
+**CLI Changes:**
+
+1. **Prometheus config**: When `observability.level: 2`, add scrape target:
+```yaml
+- job_name: 'agent-level2'
+  static_configs:
+    - targets: ['{{.Name}}:{{.ObservabilityMetricsPort}}']
+  scrape_interval: 15s
+```
+
+2. **Grafana dashboards**: New variant `agent-level2-overview.json` with panels:
+   - Token Rate (rate of `volra_llm_tokens_total`)
+   - Cost Trending (`rate(volra_llm_cost_dollars_total[1h])` by model)
+   - Token Usage (stacked bar: input vs output by model)
+   - Cost per Model (pie chart)
+   - LLM Latency P50/P95/P99 (`volra_llm_request_duration_seconds`)
+   - Error Rate by Type (`rate(volra_llm_errors_total[5m])`)
+   - Daily Cost Gauge (with configurable threshold)
+   - Tool Call Frequency (`rate(volra_tool_calls_total[5m])`)
+
+3. **`volra doctor`**: When `level: 2`, add check:
+   - Verify `:9101/metrics` responds (warns if endpoint not reachable: "Install volra-observe to enable Level 2 metrics")
+
+**Template Context Extension:**
+
+```go
+type TemplateContext struct {
+    // ... existing ...
+    ObservabilityLevel       int  // 1 or 2
+    ObservabilityMetricsPort int  // resolved port
+    HasLevel2                bool // shorthand for Level >= 2
+}
+```
+
+**Test Strategy:**
+- Unit tests: `ObservabilityConfig` parsing, validation (no framework constraint), template context resolution
+- Golden file tests: prometheus.yml with Level 2 scrape target, new dashboard JSON
+- No E2E test for Level 2 (requires Python package + LLM API keys — integration test)
+
+---
+
+### Extension 9: Volra MCP Server
+
+**ADR: Direct protocol implementation over MCP SDK**
+
+MCP over stdio is JSON-RPC 2.0 — approximately 200 lines of Go to implement the protocol layer. Using an external SDK adds dependency risk for a simple protocol. Direct implementation gives full control and zero dependencies.
+
+**New Command: `volra mcp`**
+
+```
+volra mcp    # Start MCP server on stdio (for editor integration)
+```
+
+Reads JSON-RPC from stdin, writes to stdout. Stderr for debug logs.
+
+**Editor Configuration Example (Cursor/Claude Code):**
+```json
+{
+  "mcpServers": {
+    "volra": {
+      "command": "volra",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**Package Structure:**
+
+```
+internal/mcp/
+  server.go       — JSON-RPC server loop (stdin reader → dispatch → stdout writer)
+  handler.go      — Tool registry + dispatch (map[string]ToolHandler)
+  tools.go        — Tool definitions (name, description, inputSchema per MCP spec)
+  protocol.go     — MCP protocol types (InitializeRequest, ToolCallRequest, etc.)
+```
+
+**Tools Exposed:**
+
+| Tool | Description | Parameters | Returns |
+|------|-------------|------------|---------|
+| `volra_deploy` | Deploy agent from directory | `path` (string, default cwd) | Deploy result (status, URLs, timing) |
+| `volra_status` | Check agent health | `path` (string, default cwd) | Health summary (agent + services) |
+| `volra_logs` | Get recent agent logs | `path` (string), `lines` (int, default 50) | Log output (string) |
+| `volra_doctor` | Run diagnostics | none | Check results (pass/fail list) |
+
+**Implementation Pattern:**
+
+```go
+// server.go
+func Serve(ctx context.Context, in io.Reader, out io.Writer) error {
+    scanner := bufio.NewScanner(in)
+    encoder := json.NewEncoder(out)
+    for scanner.Scan() {
+        var req jsonrpc.Request
+        json.Unmarshal(scanner.Bytes(), &req)
+        resp := dispatch(ctx, req)
+        encoder.Encode(resp)
+    }
+    return scanner.Err()
+}
+```
+
+**Cobra Integration:**
+
+```go
+// cmd/mcp.go
+var mcpCmd = &cobra.Command{
+    Use:   "mcp",
+    Short: "Start MCP server for editor integration",
+    RunE: func(cmd *cobra.Command, args []string) error {
+        return mcp.Serve(cmd.Context(), os.Stdin, os.Stdout)
+    },
+}
+```
+
+**HTTP/SSE Transport:** Deferred to v0.3 (for remote management scenarios).
+
+**Test Strategy:**
+- Unit tests: JSON-RPC parsing, tool dispatch, response formatting
+- Integration tests: pipe stdin/stdout in test, verify tool call → response cycle
+- No E2E: MCP server is tested via protocol simulation, not actual editor
+
+---
+
+### Extension: `volra logs` Command
+
+**Minimal command — not a full architecture extension.**
+
+```go
+// cmd/logs.go
+var logsCmd = &cobra.Command{
+    Use:   "logs [service]",
+    Short: "Stream logs from deployed agent",
+    RunE: func(cmd *cobra.Command, args []string) error {
+        af, err := agentfile.Load(".")
+        if err != nil { return err }
+        service := af.Name // default: agent container
+        if len(args) > 0 { service = args[0] }
+        composePath := filepath.Join(".volra", "docker-compose.yml")
+        return docker.StreamLogs(cmd.Context(), composePath, service, cmd.Flag("follow").Value.String() == "true")
+    },
+}
+```
+
+Flags: `--follow` / `-f` (stream), `--lines` / `-n` (tail count, default 100).
+
+---
+
+### Extension: `volra quickstart` Command
+
+**New command + embedded templates.**
+
+```go
+// cmd/quickstart.go
+var quickstartCmd = &cobra.Command{
+    Use:   "quickstart [template] [directory]",
+    Short: "Create a new agent project from a template",
+    RunE:  runQuickstart,
+}
+```
+
+**Embedded Templates:**
+
+```
+internal/templates/
+  basic/
+    main.py
+    requirements.txt
+    Agentfile
+    README.md
+  rag/
+    main.py
+    requirements.txt
+    Agentfile
+    README.md
+  conversational/
+    main.py
+    requirements.txt
+    Agentfile
+    README.md
+```
+
+Templates embedded via `//go:embed templates/*` in `internal/templates/templates.go`.
+
+Converted from existing E2E test agents (A1 echo-agent → basic, A4 rag-kb → rag, A5 conv-agent → conversational) with user-facing README and documentation.
+
+**Command Flow:**
+1. List templates if no argument: `volra quickstart` shows available templates
+2. Copy template to target directory: `volra quickstart rag my-rag-agent`
+3. Replace placeholder names with project name
+4. Print next steps: "cd my-rag-agent && volra deploy"
+
+---
+
+### v0.2 Field Count Summary
+
+After v0.2: ~16 Agentfile fields (existing 15 from v2.1 + `observability` struct with 2 sub-fields)
+
+### v0.2 New Package Summary
+
+| Package | Type | Purpose |
+|---------|------|---------|
+| `internal/mcp/` | NEW | MCP server implementation |
+| `internal/templates/` | NEW | Embedded quickstart templates |
+| `cmd/mcp.go` | NEW | MCP command entry point |
+| `cmd/logs.go` | NEW | Logs command entry point |
+| `cmd/quickstart.go` | NEW | Quickstart command entry point |
+| `volra-observe` (Python, separate repo) | NEW | Framework-agnostic LLM instrumentation for Level 2 metrics |
+
+### v0.2 Backward Compatibility
+
+All v0.1 Agentfiles (including v2.1 schema) MUST parse without errors with v0.2 CLI. New `observability` field defaults to nil (Level 1 behavior). New commands (`mcp`, `logs`, `quickstart`) do not affect existing commands.

@@ -1,9 +1,9 @@
 #!/bin/sh
-# Volra installer — https://github.com/antonioromero/volra
-# Usage: curl -fsSL https://raw.githubusercontent.com/antonioromero/volra/main/install.sh | sh
+# Volra installer — https://github.com/romerox3/volra
+# Usage: curl -fsSL https://raw.githubusercontent.com/romerox3/volra/main/install.sh | sh
 set -e
 
-REPO="antonioromero/volra"
+REPO="romerox3/volra"
 BINARY="volra"
 INSTALL_DIR="/usr/local/bin"
 

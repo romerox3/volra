@@ -30,5 +30,6 @@ jobs:
           files: |
             bin/volra-darwin-arm64
             bin/volra-linux-amd64
+            bin/volra-linux-arm64
             bin/SHA256SUMS
           generate_release_notes: true
