@@ -4,3 +4,7 @@
 .volra/
 .env
 .claude/
+CLAUDE.md
+_bmad-output/
+test-polyglot-agent/
+__pycache__/
