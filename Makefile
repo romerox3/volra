@@ -29,7 +29,12 @@ build-all:  ## Cross-compile for all targets
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 ./cmd/volra
 
 checksums:  ## Generate SHA256 checksums
-	cd $(BUILD_DIR) && shasum -a 256 $(BINARY_NAME)-* > SHA256SUMS
+	cd $(BUILD_DIR) && \
+	  if command -v sha256sum > /dev/null 2>&1; then \
+	    sha256sum $(BINARY_NAME)-* > SHA256SUMS; \
+	  else \
+	    shasum -a 256 $(BINARY_NAME)-* > SHA256SUMS; \
+	  fi
 
 clean:  ## Remove build artifacts
 	rm -rf $(BUILD_DIR)
