@@ -5,14 +5,16 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os/exec"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/antonioromero/volra/internal/docker"
-	"github.com/antonioromero/volra/internal/output"
+	"github.com/romerox3/volra/internal/agentfile"
+	"github.com/romerox3/volra/internal/docker"
+	"github.com/romerox3/volra/internal/output"
 )
 
 // checkResult holds the outcome of a single prerequisite check.
@@ -62,7 +64,8 @@ func (d *defaultSystemInfo) IsPortFree(port int) bool {
 }
 
 // Run executes all prerequisite checks and reports results via the Presenter.
-func Run(ctx context.Context, version string, p output.Presenter, r docker.DockerRunner, sys SystemInfo) error {
+// If af is provided and has observability.level >= 2, an additional Level 2 check is performed.
+func Run(ctx context.Context, version string, p output.Presenter, r docker.DockerRunner, sys SystemInfo, af ...*agentfile.Agentfile) error {
 	if sys == nil {
 		sys = &defaultSystemInfo{}
 	}
@@ -70,6 +73,15 @@ func Run(ctx context.Context, version string, p output.Presenter, r docker.Docke
 	p.Progress("Checking prerequisites...")
 
 	results := runAllChecks(ctx, r, sys)
+
+	// Optional Level 2 observability check.
+	if len(af) > 0 && af[0] != nil && af[0].Observability != nil && af[0].Observability.Level >= 2 {
+		metricsPort := 9101
+		if af[0].Observability.MetricsPort > 0 {
+			metricsPort = af[0].Observability.MetricsPort
+		}
+		results = append(results, checkLevel2Metrics(metricsPort))
+	}
 
 	failed := false
 	for _, res := range results {
@@ -236,6 +248,23 @@ func checkDiskSpace(sys SystemInfo) checkResult {
 	}
 
 	return checkResult{name: "disk-space", passed: true, detail: fmt.Sprintf("Disk space: %.0f GB available", availGB)}
+}
+
+func checkLevel2Metrics(port int) checkResult {
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/metrics", port))
+	if err != nil {
+		return checkResult{
+			name: "level2-metrics",
+			warn: &output.UserWarning{
+				What:     fmt.Sprintf("Level 2 metrics endpoint not reachable on port %d", port),
+				Assumed:  "Level 2 observability configured but metrics endpoint not responding",
+				Override: "Install volra-observe in your agent: pip install volra-observe",
+			},
+		}
+	}
+	_ = resp.Body.Close()
+	return checkResult{name: "level2-metrics", passed: true, detail: fmt.Sprintf("Level 2 metrics endpoint responding on port %d", port)}
 }
 
 func checkPorts(sys SystemInfo, ports ...int) []checkResult {

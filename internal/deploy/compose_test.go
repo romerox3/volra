@@ -3,56 +3,54 @@ package deploy
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
-	"github.com/antonioromero/volra/internal/agentfile"
-	"github.com/antonioromero/volra/internal/testutil"
+	"github.com/romerox3/volra/internal/agentfile"
+	"github.com/romerox3/volra/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRenderCompose_Minimal(t *testing.T) {
-	tc := &TemplateContext{
+// minimalTC returns a TemplateContext with all required fields populated.
+func minimalTC(name string, port int) *TemplateContext {
+	return &TemplateContext{
 		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "my-agent", Framework: agentfile.FrameworkGeneric,
-			Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+			Version: 1, Name: name, Framework: agentfile.FrameworkGeneric,
+			Port: port, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
 		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
+		PythonVersion:      "3.11",
+		EntryPoint:         "main.py",
+		PackageManager:     "pip",
+		HasRequirements:    true,
+		AgentHostPort:      port,
+		PrometheusHostPort: 9090,
+		GrafanaHostPort:    3001,
 	}
+}
+
+func TestRenderCompose_Minimal(t *testing.T) {
+	tc := minimalTC("my-agent", 8000)
 	got, err := RenderCompose(tc)
 	require.NoError(t, err)
 	testutil.AssertGolden(t, got, filepath.Join("testdata", "golden", "compose_minimal.golden"))
 }
 
 func TestRenderCompose_WithEnv(t *testing.T) {
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "my-agent", Framework: agentfile.FrameworkGeneric,
-			Port: 9000, HealthPath: "/healthz",
-			Env:        []string{"API_KEY", "DB_URL"},
-			Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.12",
-		EntryPoint:      "app.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("my-agent", 9000)
+	tc.Env = []string{"API_KEY", "DB_URL"}
+	tc.AgentHostPort = 9000
+	tc.PythonVersion = "3.12"
+	tc.EntryPoint = "app.py"
+	tc.HealthPath = "/healthz"
 	got, err := RenderCompose(tc)
 	require.NoError(t, err)
 	testutil.AssertGolden(t, got, filepath.Join("testdata", "golden", "compose_with_env.golden"))
 }
 
 func TestRenderCompose_CustomDockerfile(t *testing.T) {
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "my-agent", Framework: agentfile.FrameworkGeneric,
-			Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeCustom,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("my-agent", 8000)
+	tc.Dockerfile = agentfile.DockerfileModeCustom
 	got, err := RenderCompose(tc)
 	require.NoError(t, err)
 	assert.Contains(t, got, "dockerfile: Dockerfile")
@@ -60,15 +58,7 @@ func TestRenderCompose_CustomDockerfile(t *testing.T) {
 }
 
 func TestRenderCompose_ThreeServices(t *testing.T) {
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
-			Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("test", 8000)
 	got, err := RenderCompose(tc)
 	require.NoError(t, err)
 	assert.Contains(t, got, "agent:")
@@ -77,15 +67,7 @@ func TestRenderCompose_ThreeServices(t *testing.T) {
 }
 
 func TestRenderCompose_ProjectName(t *testing.T) {
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "cool-agent", Framework: agentfile.FrameworkGeneric,
-			Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("cool-agent", 8000)
 	got, err := RenderCompose(tc)
 	require.NoError(t, err)
 	assert.Contains(t, got, "name: cool-agent")
@@ -95,15 +77,8 @@ func TestRenderCompose_ProjectName(t *testing.T) {
 }
 
 func TestRenderCompose_PortMapping(t *testing.T) {
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
-			Port: 3000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("test", 3000)
+	tc.AgentHostPort = 3000
 	got, err := RenderCompose(tc)
 	require.NoError(t, err)
 	assert.Contains(t, got, `"3000:3000"`)
@@ -112,15 +87,7 @@ func TestRenderCompose_PortMapping(t *testing.T) {
 }
 
 func TestRenderCompose_PrometheusVolumes(t *testing.T) {
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
-			Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("test", 8000)
 	got, err := RenderCompose(tc)
 	require.NoError(t, err)
 	assert.Contains(t, got, "prometheus.yml:/etc/prometheus/prometheus.yml:ro")
@@ -129,15 +96,7 @@ func TestRenderCompose_PrometheusVolumes(t *testing.T) {
 }
 
 func TestRenderCompose_GrafanaConfig(t *testing.T) {
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
-			Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("test", 8000)
 	got, err := RenderCompose(tc)
 	require.NoError(t, err)
 	assert.Contains(t, got, "GF_AUTH_ANONYMOUS_ENABLED=true")
@@ -149,15 +108,7 @@ func TestRenderCompose_GrafanaConfig(t *testing.T) {
 
 func TestGenerateCompose_WritesFile(t *testing.T) {
 	dir := t.TempDir()
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
-			Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("test", 8000)
 	err := GenerateCompose(tc, dir)
 	require.NoError(t, err)
 
@@ -168,33 +119,366 @@ func TestGenerateCompose_WritesFile(t *testing.T) {
 }
 
 func TestRenderCompose_NoEnvFile(t *testing.T) {
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
-			Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("test", 8000)
 	got, err := RenderCompose(tc)
 	require.NoError(t, err)
 	assert.NotContains(t, got, "env_file")
 }
 
-func TestRenderCompose_Network(t *testing.T) {
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
-			Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
+// --- Volumes compose tests ---
+
+func TestRenderCompose_WithVolumes(t *testing.T) {
+	tc := minimalTC("my-agent", 8000)
+	tc.VolumeSpecs = []VolumeSpec{
+		{Name: "my-agent-data", MountPath: "/data"},
+		{Name: "my-agent-models", MountPath: "/models"},
 	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "my-agent-data:/data")
+	assert.Contains(t, got, "my-agent-models:/models")
+	assert.Contains(t, got, "my-agent-data:")
+	assert.Contains(t, got, "my-agent-models:")
+	assert.Contains(t, got, "prometheus-data:")
+}
+
+func TestRenderCompose_WithVolumes_Golden(t *testing.T) {
+	tc := minimalTC("my-agent", 8000)
+	tc.VolumeSpecs = []VolumeSpec{
+		{Name: "my-agent-data", MountPath: "/data"},
+		{Name: "my-agent-models", MountPath: "/models"},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	testutil.AssertGolden(t, got, filepath.Join("testdata", "golden", "compose_volumes.golden"))
+}
+
+func TestRenderCompose_NoVolumes(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.NotContains(t, got, "my-agent-data")
+	assert.Contains(t, got, "prometheus-data:")
+}
+
+func TestRenderCompose_Network(t *testing.T) {
+	tc := minimalTC("test", 8000)
 	got, err := RenderCompose(tc)
 	require.NoError(t, err)
 	assert.Contains(t, got, "networks:")
 	assert.Contains(t, got, "volra:")
 	assert.Contains(t, got, "driver: bridge")
+}
+
+// --- Services compose tests ---
+
+func TestRenderCompose_WithServices(t *testing.T) {
+	tc := minimalTC("my-agent", 8000)
+	tc.ServiceContexts = []ServiceContext{
+		{Name: "db", Image: "postgres:16", Port: 5432, HostPort: 5432, Env: []string{"POSTGRES_PASSWORD"},
+			VolumeSpecs: []VolumeSpec{{Name: "my-agent-db-var-lib-postgresql-data", MountPath: "/var/lib/postgresql/data"}}},
+		{Name: "redis", Image: "redis:7-alpine"},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "my-agent-db:")
+	assert.Contains(t, got, "image: postgres:16")
+	assert.Contains(t, got, "my-agent-redis:")
+	assert.Contains(t, got, "image: redis:7-alpine")
+	assert.Contains(t, got, "depends_on:")
+	assert.Contains(t, got, `"5432:5432"`)
+	assert.Contains(t, got, "env_file:")
+	assert.Contains(t, got, "my-agent-db-var-lib-postgresql-data:/var/lib/postgresql/data")
+	assert.Contains(t, got, "my-agent-db-var-lib-postgresql-data:")
+}
+
+func TestRenderCompose_WithServices_Golden(t *testing.T) {
+	tc := minimalTC("my-agent", 8000)
+	tc.ServiceContexts = []ServiceContext{
+		{Name: "db", Image: "postgres:16", Port: 5432, HostPort: 5432, Env: []string{"POSTGRES_PASSWORD"},
+			VolumeSpecs: []VolumeSpec{{Name: "my-agent-db-var-lib-postgresql-data", MountPath: "/var/lib/postgresql/data"}}},
+		{Name: "redis", Image: "redis:7-alpine"},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	testutil.AssertGolden(t, got, filepath.Join("testdata", "golden", "compose_services.golden"))
+}
+
+func TestRenderCompose_NoServices(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.NotContains(t, got, "postgres")
+	assert.NotContains(t, got, "redis")
+	agentSection := got[:strings.Index(got, "blackbox:")]
+	assert.NotContains(t, agentSection, "depends_on:")
+}
+
+func TestRenderCompose_ServicesSorted(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.ServiceContexts = []ServiceContext{
+		{Name: "alpha", Image: "a:1"},
+		{Name: "beta", Image: "b:1"},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	alphaIdx := strings.Index(got, "test-alpha:")
+	betaIdx := strings.Index(got, "test-beta:")
+	assert.Greater(t, betaIdx, alphaIdx, "services should be in alphabetical order")
+}
+
+func TestRenderCompose_ServiceDependsOn(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.ServiceContexts = []ServiceContext{
+		{Name: "redis", Image: "redis:7"},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "depends_on:")
+	assert.Contains(t, got, "test-redis:")
+	assert.Contains(t, got, "condition: service_started")
+}
+
+// --- Service healthcheck compose tests ---
+
+func TestRenderCompose_ServiceHealthcheck(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.ServiceContexts = []ServiceContext{
+		{Name: "db", Image: "postgres:16", Healthcheck: &DeployHealthcheck{
+			Test: []string{"CMD-SHELL", "pg_isready -U postgres || exit 1"},
+			Interval: "5s", Timeout: "3s", Retries: 5, StartPeriod: "10s",
+		}},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "healthcheck:")
+	assert.Contains(t, got, `["CMD-SHELL","pg_isready -U postgres || exit 1"]`)
+	assert.Contains(t, got, "interval: 5s")
+	assert.Contains(t, got, "retries: 5")
+	assert.Contains(t, got, "condition: service_healthy")
+}
+
+func TestRenderCompose_ServiceHealthcheckAuto(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	// resolveHealthcheck is tested in service_defaults_test.go
+	// Here we test that auto-resolved HC appears in the template via ServiceContext
+	tc.ServiceContexts = []ServiceContext{
+		{Name: "redis", Image: "redis:7-alpine", Healthcheck: &DeployHealthcheck{
+			Test: []string{"CMD-SHELL", "redis-cli ping | grep -q PONG"},
+			Interval: "5s", Timeout: "3s", Retries: 5, StartPeriod: "5s",
+		}},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "healthcheck:")
+	assert.Contains(t, got, "condition: service_healthy")
+}
+
+func TestRenderCompose_DependsOnHealthy(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.ServiceContexts = []ServiceContext{
+		{Name: "db", Image: "postgres:16", Healthcheck: &DeployHealthcheck{
+			Test: []string{"CMD-SHELL", "pg_isready"}, Interval: "5s", Timeout: "3s", Retries: 5, StartPeriod: "10s",
+		}},
+		{Name: "redis", Image: "redis:7"},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	// db has healthcheck → service_healthy
+	assert.Contains(t, got, "condition: service_healthy")
+	// redis has no healthcheck → service_started
+	assert.Contains(t, got, "condition: service_started")
+}
+
+// --- Service port separation tests ---
+
+func TestRenderCompose_ServiceNoHostPort(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.ServiceContexts = []ServiceContext{
+		{Name: "redis", Image: "redis:7", Port: 6379, HostPort: 0},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	// redis should NOT have ports section
+	redisIdx := strings.Index(got, "test-redis:")
+	blackboxIdx := strings.Index(got, "blackbox:")
+	redisSection := got[redisIdx:blackboxIdx]
+	assert.NotContains(t, redisSection, "ports:")
+}
+
+func TestRenderCompose_ServiceWithHostPort(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.ServiceContexts = []ServiceContext{
+		{Name: "db", Image: "postgres:16", Port: 5432, HostPort: 15432},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, `"15432:5432"`)
+}
+
+func TestRenderCompose_AgentHostPort(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.AgentHostPort = 18000
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, `"18000:8000"`)
+}
+
+// --- Resource limits compose tests ---
+
+func TestRenderCompose_ServiceResources(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.ServiceContexts = []ServiceContext{
+		{Name: "db", Image: "postgres:16", Resources: &DeployResources{
+			MemLimit: "512m", CPUs: "0.5",
+		}},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "deploy:")
+	assert.Contains(t, got, "resources:")
+	assert.Contains(t, got, "limits:")
+	assert.Contains(t, got, "memory: 512m")
+	assert.Contains(t, got, `cpus: "0.5"`)
+}
+
+// --- Tmpfs compose tests ---
+
+func TestRenderCompose_WithTmpfs(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.Security = &agentfile.SecurityContext{ReadOnly: true}
+	tc.SecurityTmpfs = []agentfile.TmpfsMount{
+		{Path: "/tmp", Size: "100M"},
+		{Path: "/app/__pycache__", Size: "50M"},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "tmpfs:")
+	assert.Contains(t, got, "/tmp:size=100M")
+	assert.Contains(t, got, "/app/__pycache__:size=50M")
+}
+
+// --- Security compose tests ---
+
+func TestRenderCompose_WithSecurityFull(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.Security = &agentfile.SecurityContext{
+		ReadOnly:         true,
+		NoNewPrivileges:  true,
+		DropCapabilities: []string{"ALL"},
+	}
+	tc.SecurityTmpfs = []agentfile.TmpfsMount{
+		{Path: "/tmp", Size: "100M"},
+		{Path: "/app/__pycache__", Size: "50M"},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "read_only: true")
+	assert.Contains(t, got, "security_opt:")
+	assert.Contains(t, got, "no-new-privileges:true")
+	assert.Contains(t, got, "cap_drop:")
+	assert.Contains(t, got, "- ALL")
+}
+
+func TestRenderCompose_WithSecurityPartial(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.Security = &agentfile.SecurityContext{
+		ReadOnly: true,
+	}
+	tc.SecurityTmpfs = []agentfile.TmpfsMount{
+		{Path: "/tmp", Size: "100M"},
+		{Path: "/app/__pycache__", Size: "50M"},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "read_only: true")
+	assert.NotContains(t, got, "security_opt:")
+	assert.NotContains(t, got, "cap_drop:")
+}
+
+func TestRenderCompose_NoSecurity(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.NotContains(t, got, "read_only:")
+	assert.NotContains(t, got, "security_opt:")
+	assert.NotContains(t, got, "cap_drop:")
+	assert.NotContains(t, got, "tmpfs:")
+}
+
+// --- GPU compose tests ---
+
+func TestRenderCompose_WithGPU(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.GPU = true
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "deploy:")
+	assert.Contains(t, got, "resources:")
+	assert.Contains(t, got, "reservations:")
+	assert.Contains(t, got, "driver: nvidia")
+	assert.Contains(t, got, "count: all")
+	assert.Contains(t, got, "capabilities: [gpu]")
+}
+
+func TestRenderCompose_NoGPU(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	// No deploy block on agent (only appears when GPU or on services with resources)
+	agentSection := got[:strings.Index(got, "blackbox:")]
+	assert.NotContains(t, agentSection, "deploy:")
+	assert.NotContains(t, got, "driver: nvidia")
+}
+
+func TestRenderCompose_WithSecurityEmpty(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.Security = &agentfile.SecurityContext{}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.NotContains(t, got, "read_only:")
+	assert.NotContains(t, got, "security_opt:")
+	assert.NotContains(t, got, "cap_drop:")
+}
+
+func TestRenderCompose_WithSecurityAndGPU(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.Security = &agentfile.SecurityContext{
+		ReadOnly:         true,
+		NoNewPrivileges:  true,
+		DropCapabilities: []string{"ALL"},
+	}
+	tc.SecurityTmpfs = []agentfile.TmpfsMount{
+		{Path: "/tmp", Size: "100M"},
+		{Path: "/app/__pycache__", Size: "50M"},
+	}
+	tc.GPU = true
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "read_only: true")
+	assert.Contains(t, got, "security_opt:")
+	assert.Contains(t, got, "cap_drop:")
+	assert.Contains(t, got, "deploy:")
+	assert.Contains(t, got, "driver: nvidia")
+	assert.Contains(t, got, "networks:")
+}
+
+// --- Env file path tests ---
+
+func TestRenderCompose_EnvFilePath_Agent(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.Env = []string{"API_KEY"}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "./agent.env")
+}
+
+func TestRenderCompose_EnvFilePath_Service(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.ServiceContexts = []ServiceContext{
+		{Name: "db", Image: "postgres:16", Port: 5432, HostPort: 5432, Env: []string{"POSTGRES_PASSWORD"}},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "./test-db.env")
 }

@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,7 +32,15 @@ func RenderCompose(tc *TemplateContext) (string, error) {
 		return "", fmt.Errorf("reading compose template: %w", err)
 	}
 
-	tmpl, err := template.New("compose").Parse(string(tmplData))
+	funcMap := template.FuncMap{
+		"toJSON": func(v interface{}) string {
+			b, _ := json.Marshal(v)
+			return string(b)
+		},
+		"gt": func(a, b int) bool { return a > b },
+	}
+
+	tmpl, err := template.New("compose").Funcs(funcMap).Parse(string(tmplData))
 	if err != nil {
 		return "", fmt.Errorf("parsing compose template: %w", err)
 	}

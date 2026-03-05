@@ -1,18 +1,19 @@
 package setup
 
 import (
-	"github.com/antonioromero/volra/internal/agentfile"
-	"github.com/antonioromero/volra/internal/output"
+	"github.com/romerox3/volra/internal/agentfile"
+	"github.com/romerox3/volra/internal/output"
 )
 
 // ScanResult holds all auto-detected project properties.
 type ScanResult struct {
-	Framework  agentfile.Framework
-	EntryPoint string
-	Port       int
-	HealthPath string
-	EnvVars    []string
-	Warnings   []*output.UserWarning
+	Framework      agentfile.Framework
+	PackageManager agentfile.PackageManager
+	EntryPoint     string
+	Port           int
+	HealthPath     string
+	EnvVars        []string
+	Warnings       []*output.UserWarning
 }
 
 // ScanProject scans a Python project directory and detects configuration values.
@@ -20,6 +21,7 @@ func ScanProject(dir string) *ScanResult {
 	result := &ScanResult{}
 
 	result.Framework = detectFramework(dir)
+	result.PackageManager = detectPackageManager(dir)
 
 	entry, entryWarn := detectEntryPoint(dir)
 	result.EntryPoint = entry

@@ -1,9 +1,8 @@
 package main
 
 import (
-	"github.com/antonioromero/volra/internal/docker"
-	"github.com/antonioromero/volra/internal/output"
-	"github.com/antonioromero/volra/internal/status"
+	"github.com/romerox3/volra/internal/docker"
+	"github.com/romerox3/volra/internal/status"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +15,8 @@ var statusCmd = &cobra.Command{
 		if len(args) > 0 {
 			dir = args[0]
 		}
-		p := output.NewPresenter(output.DetectMode())
+		p := newPresenter()
+		defer flushPresenter(p)
 		dr := docker.NewExecRunner()
 		return status.Run(cmd.Context(), dir, p, dr)
 	},

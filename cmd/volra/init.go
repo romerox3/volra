@@ -1,8 +1,7 @@
 package main
 
 import (
-	"github.com/antonioromero/volra/internal/output"
-	"github.com/antonioromero/volra/internal/setup"
+	"github.com/romerox3/volra/internal/setup"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +16,8 @@ var initCmd = &cobra.Command{
 		if len(args) > 0 {
 			dir = args[0]
 		}
-		p := output.NewPresenter(output.DetectMode())
+		p := newPresenter()
+		defer flushPresenter(p)
 		return setup.Run(cmd.Context(), dir, initForce, p)
 	},
 }

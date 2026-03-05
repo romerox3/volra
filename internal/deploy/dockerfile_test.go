@@ -5,52 +5,36 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/antonioromero/volra/internal/agentfile"
-	"github.com/antonioromero/volra/internal/testutil"
+	"github.com/romerox3/volra/internal/agentfile"
+	"github.com/romerox3/volra/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRenderDockerfile_WithRequirements(t *testing.T) {
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "my-agent", Framework: agentfile.FrameworkGeneric,
-			Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("my-agent", 8000)
 	got, err := RenderDockerfile(tc)
 	require.NoError(t, err)
 	testutil.AssertGolden(t, got, filepath.Join("testdata", "golden", "dockerfile_requirements.golden"))
 }
 
 func TestRenderDockerfile_WithPyproject(t *testing.T) {
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "my-agent", Framework: agentfile.FrameworkLangGraph,
-			Port: 9000, HealthPath: "/healthz", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.12",
-		EntryPoint:      "app.py",
-		HasRequirements: false,
-	}
+	tc := minimalTC("my-agent", 9000)
+	tc.Framework = agentfile.FrameworkLangGraph
+	tc.HealthPath = "/healthz"
+	tc.PythonVersion = "3.12"
+	tc.EntryPoint = "app.py"
+	tc.HasRequirements = false
+	tc.AgentHostPort = 9000
 	got, err := RenderDockerfile(tc)
 	require.NoError(t, err)
 	testutil.AssertGolden(t, got, filepath.Join("testdata", "golden", "dockerfile_pyproject.golden"))
 }
 
 func TestRenderDockerfile_CustomPort(t *testing.T) {
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
-			Port: 3000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "server.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("test", 3000)
+	tc.EntryPoint = "server.py"
+	tc.AgentHostPort = 3000
 	got, err := RenderDockerfile(tc)
 	require.NoError(t, err)
 	assert.Contains(t, got, "EXPOSE 3000")
@@ -59,15 +43,7 @@ func TestRenderDockerfile_CustomPort(t *testing.T) {
 
 func TestGenerateDockerfile_WritesFile(t *testing.T) {
 	dir := t.TempDir()
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
-			Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("test", 8000)
 	err := GenerateDockerfile(tc, dir)
 	require.NoError(t, err)
 
@@ -79,21 +55,68 @@ func TestGenerateDockerfile_WritesFile(t *testing.T) {
 
 func TestGenerateDockerfile_CreatesOutputDir(t *testing.T) {
 	dir := t.TempDir()
-	tc := &TemplateContext{
-		Agentfile: agentfile.Agentfile{
-			Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
-			Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
-		},
-		PythonVersion:   "3.11",
-		EntryPoint:      "main.py",
-		HasRequirements: true,
-	}
+	tc := minimalTC("test", 8000)
 	err := GenerateDockerfile(tc, dir)
 	require.NoError(t, err)
 
 	info, err := os.Stat(filepath.Join(dir, OutputDir))
 	require.NoError(t, err)
 	assert.True(t, info.IsDir())
+}
+
+func TestRenderDockerfile_WithBuild(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.Build = &agentfile.BuildConfig{
+		SetupCommands: []string{
+			"python -m nltk.downloader punkt",
+			"python -c \"import transformers; transformers.AutoTokenizer.from_pretrained('bert-base-uncased')\"",
+		},
+		CacheDirs: []string{"/root/nltk_data", "/root/.cache/huggingface"},
+	}
+	got, err := RenderDockerfile(tc)
+	require.NoError(t, err)
+	testutil.AssertGolden(t, got, filepath.Join("testdata", "golden", "dockerfile_build.golden"))
+}
+
+func TestRenderDockerfile_Poetry(t *testing.T) {
+	tc := minimalTC("my-agent", 8000)
+	tc.PackageManager = "poetry"
+	tc.HasRequirements = false
+	tc.PythonVersion = "3.12"
+	got, err := RenderDockerfile(tc)
+	require.NoError(t, err)
+	testutil.AssertGolden(t, got, filepath.Join("testdata", "golden", "dockerfile_poetry.golden"))
+}
+
+func TestRenderDockerfile_UV(t *testing.T) {
+	tc := minimalTC("my-agent", 8000)
+	tc.PackageManager = "uv"
+	tc.HasRequirements = false
+	tc.PythonVersion = "3.12"
+	got, err := RenderDockerfile(tc)
+	require.NoError(t, err)
+	testutil.AssertGolden(t, got, filepath.Join("testdata", "golden", "dockerfile_uv.golden"))
+}
+
+func TestRenderDockerfile_Pipenv(t *testing.T) {
+	tc := minimalTC("my-agent", 8000)
+	tc.PackageManager = "pipenv"
+	tc.HasRequirements = false
+	tc.PythonVersion = "3.11"
+	got, err := RenderDockerfile(tc)
+	require.NoError(t, err)
+	testutil.AssertGolden(t, got, filepath.Join("testdata", "golden", "dockerfile_pipenv.golden"))
+}
+
+func TestRenderDockerfile_WithBuildNoCacheDirs(t *testing.T) {
+	tc := minimalTC("test", 8000)
+	tc.Build = &agentfile.BuildConfig{
+		SetupCommands: []string{"echo setup done"},
+	}
+	got, err := RenderDockerfile(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "RUN echo setup done")
+	assert.NotContains(t, got, "COPY --from=builder /root")
 }
 
 // --- BuildContext tests ---
@@ -110,7 +133,10 @@ func TestBuildContext_WithRequirements(t *testing.T) {
 	tc := BuildContext(af, dir)
 	assert.True(t, tc.HasRequirements)
 	assert.Equal(t, "main.py", tc.EntryPoint)
-	assert.Equal(t, "3.11", tc.PythonVersion) // fallback
+	assert.Equal(t, "3.11", tc.PythonVersion)
+	assert.Equal(t, 8000, tc.AgentHostPort)
+	assert.Equal(t, 9090, tc.PrometheusHostPort)
+	assert.Equal(t, 3001, tc.GrafanaHostPort)
 }
 
 func TestBuildContext_WithPyproject(t *testing.T) {
@@ -137,8 +163,8 @@ func TestBuildContext_FallbackDefaults(t *testing.T) {
 	}
 	tc := BuildContext(af, dir)
 	assert.False(t, tc.HasRequirements)
-	assert.Equal(t, "main.py", tc.EntryPoint) // fallback
-	assert.Equal(t, "3.11", tc.PythonVersion) // fallback
+	assert.Equal(t, "main.py", tc.EntryPoint)
+	assert.Equal(t, "3.11", tc.PythonVersion)
 }
 
 func TestBuildContext_EntryPointPriority(t *testing.T) {
@@ -151,7 +177,7 @@ func TestBuildContext_EntryPointPriority(t *testing.T) {
 		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
 	}
 	tc := BuildContext(af, dir)
-	assert.Equal(t, "app.py", tc.EntryPoint) // app.py before server.py
+	assert.Equal(t, "app.py", tc.EntryPoint)
 }
 
 // --- detectPythonVersion tests ---
@@ -173,4 +199,305 @@ func TestDetectPythonVersion_NoRequiresPython(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"),
 		[]byte("[project]\nname = \"test\"\n"), 0644))
 	assert.Equal(t, "3.11", detectPythonVersion(dir))
+}
+
+// --- detectMetricsLibrary tests ---
+
+func TestDetectMetricsLibrary_InRequirementsTxt(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"),
+		[]byte("flask\nprometheus_client\nrequests\n"), 0644))
+	assert.True(t, detectMetricsLibrary(dir))
+}
+
+func TestDetectMetricsLibrary_HyphenVariant(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"),
+		[]byte("flask\nprometheus-client==0.20.0\n"), 0644))
+	assert.True(t, detectMetricsLibrary(dir))
+}
+
+func TestDetectMetricsLibrary_InPyproject(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"),
+		[]byte("[project]\ndependencies = [\"prometheus_client\", \"flask\"]\n"), 0644))
+	assert.True(t, detectMetricsLibrary(dir))
+}
+
+func TestDetectMetricsLibrary_NotPresent(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"),
+		[]byte("flask\nrequests\n"), 0644))
+	assert.False(t, detectMetricsLibrary(dir))
+}
+
+func TestDetectMetricsLibrary_NoDeps(t *testing.T) {
+	dir := t.TempDir()
+	assert.False(t, detectMetricsLibrary(dir))
+}
+
+func TestBuildContext_HasMetrics(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"),
+		[]byte("flask\nprometheus_client\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	tc := BuildContext(af, dir)
+	assert.True(t, tc.HasMetrics)
+}
+
+func TestBuildContext_WithVolumes(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "my-agent", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+		Volumes: []string{"/data", "/models"},
+	}
+	tc := BuildContext(af, dir)
+	require.Len(t, tc.VolumeSpecs, 2)
+	assert.Equal(t, "my-agent-data", tc.VolumeSpecs[0].Name)
+	assert.Equal(t, "/data", tc.VolumeSpecs[0].MountPath)
+	assert.Equal(t, "my-agent-models", tc.VolumeSpecs[1].Name)
+	assert.Equal(t, "/models", tc.VolumeSpecs[1].MountPath)
+}
+
+func TestBuildContext_NoVolumes(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	tc := BuildContext(af, dir)
+	assert.Empty(t, tc.VolumeSpecs)
+}
+
+func TestBuildContext_VolumeNameWithNestedPath(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "my-agent", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+		Volumes: []string{"/data/models"},
+	}
+	tc := BuildContext(af, dir)
+	require.Len(t, tc.VolumeSpecs, 1)
+	assert.Equal(t, "my-agent-data-models", tc.VolumeSpecs[0].Name)
+	assert.Equal(t, "/data/models", tc.VolumeSpecs[0].MountPath)
+}
+
+func TestBuildContext_NoMetrics(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"),
+		[]byte("flask\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	tc := BuildContext(af, dir)
+	assert.False(t, tc.HasMetrics)
+}
+
+// --- BuildContext service tests ---
+
+func TestBuildContext_WithServices(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "my-agent", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+		Services: map[string]agentfile.Service{
+			"redis": {Image: "redis:7-alpine"},
+			"db":    {Image: "postgres:16", Port: 5432, Volumes: []string{"/var/lib/postgresql/data"}},
+		},
+	}
+	tc := BuildContext(af, dir)
+	require.Len(t, tc.ServiceContexts, 2)
+	// Sorted by name: db before redis
+	assert.Equal(t, "db", tc.ServiceContexts[0].Name)
+	assert.Equal(t, "redis", tc.ServiceContexts[1].Name)
+	// db has volume specs
+	require.Len(t, tc.ServiceContexts[0].VolumeSpecs, 1)
+	assert.Equal(t, "my-agent-db-var-lib-postgresql-data", tc.ServiceContexts[0].VolumeSpecs[0].Name)
+	// Auto-resolved healthchecks
+	assert.NotNil(t, tc.ServiceContexts[0].Healthcheck, "postgres should get auto healthcheck")
+	assert.NotNil(t, tc.ServiceContexts[1].Healthcheck, "redis should get auto healthcheck")
+	// Auto-resolved resources
+	assert.NotNil(t, tc.ServiceContexts[0].Resources, "postgres should get auto resources")
+	assert.NotNil(t, tc.ServiceContexts[1].Resources, "redis should get auto resources")
+}
+
+func TestBuildContext_NoServices(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	tc := BuildContext(af, dir)
+	assert.Empty(t, tc.ServiceContexts)
+}
+
+// --- BuildContext host port tests ---
+
+func TestBuildContext_HostPort(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HostPort: 18000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	tc := BuildContext(af, dir)
+	assert.Equal(t, 18000, tc.AgentHostPort)
+}
+
+func TestBuildContext_NoHostPort(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	tc := BuildContext(af, dir)
+	assert.Equal(t, 8000, tc.AgentHostPort)
+}
+
+// --- BuildContext tmpfs auto-injection tests ---
+
+func TestBuildContext_ReadOnlyAutoTmpfs(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+		Security: &agentfile.SecurityContext{ReadOnly: true},
+	}
+	tc := BuildContext(af, dir)
+	require.Len(t, tc.SecurityTmpfs, 2)
+	assert.Equal(t, "/tmp", tc.SecurityTmpfs[0].Path)
+	assert.Equal(t, "/app/__pycache__", tc.SecurityTmpfs[1].Path)
+}
+
+func TestBuildContext_ReadOnlyExplicitTmpfs(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+		Security: &agentfile.SecurityContext{
+			ReadOnly: true,
+			Tmpfs: []agentfile.TmpfsMount{
+				{Path: "/custom", Size: "200M"},
+			},
+		},
+	}
+	tc := BuildContext(af, dir)
+	require.Len(t, tc.SecurityTmpfs, 1)
+	assert.Equal(t, "/custom", tc.SecurityTmpfs[0].Path)
+}
+
+func TestBuildContext_NoReadOnlyNoTmpfs(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	tc := BuildContext(af, dir)
+	assert.Empty(t, tc.SecurityTmpfs)
+}
+
+// --- PackageManager BuildContext tests ---
+
+func TestBuildContext_DetectsPoetry(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "poetry.lock"), []byte("[[package]]\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	tc := BuildContext(af, dir)
+	assert.Equal(t, "poetry", tc.PackageManager)
+}
+
+func TestBuildContext_DetectsUV(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "uv.lock"), []byte("version = 1\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	tc := BuildContext(af, dir)
+	assert.Equal(t, "uv", tc.PackageManager)
+}
+
+func TestBuildContext_DetectsPipenv(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Pipfile"), []byte("[packages]\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Pipfile.lock"), []byte("{}\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	tc := BuildContext(af, dir)
+	assert.Equal(t, "pipenv", tc.PackageManager)
+}
+
+func TestBuildContext_AgentfileOverridesPkgMgr(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("flask\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+		PackageManager: agentfile.PackageManagerPoetry,
+	}
+	tc := BuildContext(af, dir)
+	assert.Equal(t, "poetry", tc.PackageManager)
+}
+
+func TestBuildContext_DefaultsPip(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("flask\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	tc := BuildContext(af, dir)
+	assert.Equal(t, "pip", tc.PackageManager)
+}
+
+func TestDetectMetricsLibrary_InPipfile(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Pipfile"),
+		[]byte("[packages]\nprometheus_client = \"*\"\n"), 0644))
+	assert.True(t, detectMetricsLibrary(dir))
 }

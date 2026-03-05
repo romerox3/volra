@@ -3,7 +3,7 @@ package agentfile
 import (
 	"fmt"
 
-	"github.com/antonioromero/volra/internal/output"
+	"github.com/romerox3/volra/internal/output"
 	"gopkg.in/yaml.v3"
 )
 
@@ -32,6 +32,39 @@ func (f *Framework) UnmarshalYAML(value *yaml.Node) error {
 			Code: output.CodeInvalidAgentfile,
 			What: fmt.Sprintf("Invalid field: framework — %q is not a valid framework", s),
 			Fix:  "Use 'generic' or 'langgraph'",
+		}
+	}
+}
+
+// PackageManager represents the Python package manager used by the project.
+type PackageManager string
+
+const (
+	// PackageManagerPip is the default package manager (pip + requirements.txt or pyproject.toml).
+	PackageManagerPip PackageManager = "pip"
+	// PackageManagerPoetry uses Poetry for dependency management.
+	PackageManagerPoetry PackageManager = "poetry"
+	// PackageManagerUV uses uv for dependency management.
+	PackageManagerUV PackageManager = "uv"
+	// PackageManagerPipenv uses Pipenv for dependency management.
+	PackageManagerPipenv PackageManager = "pipenv"
+)
+
+// UnmarshalYAML validates the package manager value during YAML parsing.
+func (pm *PackageManager) UnmarshalYAML(value *yaml.Node) error {
+	var s string
+	if err := value.Decode(&s); err != nil {
+		return err
+	}
+	switch PackageManager(s) {
+	case PackageManagerPip, PackageManagerPoetry, PackageManagerUV, PackageManagerPipenv:
+		*pm = PackageManager(s)
+		return nil
+	default:
+		return &output.UserError{
+			Code: output.CodeInvalidAgentfile,
+			What: fmt.Sprintf("Invalid field: package_manager — %q is not a valid package manager", s),
+			Fix:  "Use 'pip', 'poetry', 'uv', or 'pipenv'",
 		}
 	}
 }

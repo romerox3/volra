@@ -16,6 +16,8 @@ const (
 	ModeNoColor
 	// ModePlain uses no colors or emoji (TERM=dumb or narrow terminal).
 	ModePlain
+	// ModeJSON outputs structured JSON (--json flag).
+	ModeJSON
 )
 
 // DetectMode determines the output mode based on environment variables

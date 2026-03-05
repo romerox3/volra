@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antonioromero/volra/internal/output"
-	"github.com/antonioromero/volra/internal/testutil"
+	"github.com/romerox3/volra/internal/output"
+	"github.com/romerox3/volra/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +24,7 @@ func TestWaitForHealth_ImmediateSuccess(t *testing.T) {
 	port := extractPort(t, srv.URL)
 	p := &testutil.MockPresenter{}
 
-	err := WaitForHealth(context.Background(), port, "/", "test", p)
+	err := WaitForHealth(context.Background(), port, "/", "test", 0, p)
 	require.NoError(t, err)
 	assert.NotEmpty(t, p.ProgressCalls)
 }
@@ -44,7 +44,7 @@ func TestWaitForHealth_EventualSuccess(t *testing.T) {
 	port := extractPort(t, srv.URL)
 	p := &testutil.MockPresenter{}
 
-	err := WaitForHealth(context.Background(), port, "/", "test", p)
+	err := WaitForHealth(context.Background(), port, "/", "test", 0, p)
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, attempts, 3)
 }
@@ -63,7 +63,7 @@ func TestWaitForHealth_Timeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	err := WaitForHealth(ctx, port, "/health", "my-agent", p)
+	err := WaitForHealth(ctx, port, "/health", "my-agent", 0, p)
 	require.Error(t, err)
 
 	var ue *output.UserError
@@ -80,7 +80,7 @@ func TestWaitForHealth_ConnectionRefused(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	err := WaitForHealth(ctx, 19999, "/health", "test", p)
+	err := WaitForHealth(ctx, 19999, "/health", "test", 0, p)
 	require.Error(t, err)
 
 	var ue *output.UserError
@@ -99,7 +99,7 @@ func TestWaitForHealth_CorrectPath(t *testing.T) {
 	port := extractPort(t, srv.URL)
 	p := &testutil.MockPresenter{}
 
-	err := WaitForHealth(context.Background(), port, "/healthz", "test", p)
+	err := WaitForHealth(context.Background(), port, "/healthz", "test", 0, p)
 	require.NoError(t, err)
 	assert.Equal(t, "/healthz", receivedPath)
 }
@@ -113,9 +113,57 @@ func TestWaitForHealth_ProgressCalled(t *testing.T) {
 	port := extractPort(t, srv.URL)
 	p := &testutil.MockPresenter{}
 
-	err := WaitForHealth(context.Background(), port, "/", "test", p)
+	err := WaitForHealth(context.Background(), port, "/", "test", 0, p)
 	require.NoError(t, err)
 	assert.Contains(t, p.ProgressCalls, "Waiting for agent health...")
+}
+
+func TestWaitForHealth_CustomTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	port := extractPort(t, srv.URL)
+	p := &testutil.MockPresenter{}
+
+	// Custom timeout of 120 seconds — should succeed immediately anyway
+	err := WaitForHealth(context.Background(), port, "/", "test", 120*time.Second, p)
+	require.NoError(t, err)
+}
+
+func TestWaitForHealth_CustomTimeoutInErrorMessage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	port := extractPort(t, srv.URL)
+	p := &testutil.MockPresenter{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := WaitForHealth(ctx, port, "/health", "test", 10*time.Second, p)
+	require.Error(t, err)
+
+	var ue *output.UserError
+	require.ErrorAs(t, err, &ue)
+	assert.Contains(t, ue.What, "timed out")
+}
+
+func TestWaitForHealth_ZeroTimeoutUsesDefault(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	port := extractPort(t, srv.URL)
+	p := &testutil.MockPresenter{}
+
+	// timeout=0 should use defaultHealthTimeout (60s), but succeed immediately
+	err := WaitForHealth(context.Background(), port, "/", "test", 0, p)
+	require.NoError(t, err)
 }
 
 func extractPort(t *testing.T, url string) int {

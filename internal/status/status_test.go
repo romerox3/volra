@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antonioromero/volra/internal/output"
-	"github.com/antonioromero/volra/internal/testutil"
+	"github.com/romerox3/volra/internal/output"
+	"github.com/romerox3/volra/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

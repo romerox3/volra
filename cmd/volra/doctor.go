@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/antonioromero/volra/internal/docker"
-	"github.com/antonioromero/volra/internal/doctor"
-	"github.com/antonioromero/volra/internal/output"
+	"github.com/romerox3/volra/internal/agentfile"
+	"github.com/romerox3/volra/internal/docker"
+	"github.com/romerox3/volra/internal/doctor"
 	"github.com/spf13/cobra"
 )
 
@@ -11,9 +11,12 @@ var doctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Check system prerequisites for Volra",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		p := output.NewPresenter(output.DetectMode())
+		p := newPresenter()
+		defer flushPresenter(p)
 		r := docker.NewExecRunner()
-		return doctor.Run(cmd.Context(), version, p, r, nil)
+		// Optionally load Agentfile for Level 2 checks (ignore errors — may not exist).
+		af, _ := agentfile.Load("Agentfile")
+		return doctor.Run(cmd.Context(), version, p, r, nil, af)
 	},
 }
 

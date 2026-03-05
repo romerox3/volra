@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/antonioromero/volra/internal/agentfile"
-	"github.com/antonioromero/volra/internal/testutil"
+	"github.com/romerox3/volra/internal/agentfile"
+	"github.com/romerox3/volra/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

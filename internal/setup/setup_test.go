@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antonioromero/volra/internal/agentfile"
-	"github.com/antonioromero/volra/internal/output"
-	"github.com/antonioromero/volra/internal/testutil"
+	"github.com/romerox3/volra/internal/agentfile"
+	"github.com/romerox3/volra/internal/output"
+	"github.com/romerox3/volra/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -204,6 +204,53 @@ func TestRun_EmitsWarnings(t *testing.T) {
 	assert.True(t, len(p.WarnCalls) >= 2, "expected at least 2 warnings, got %d", len(p.WarnCalls))
 }
 
+func TestRun_PoetryDetection(t *testing.T) {
+	dir := setupProject(t, map[string]string{
+		"pyproject.toml": "[project]\nname = \"test\"\ndependencies = [\"flask\"]\n",
+		"poetry.lock":    "[[package]]\nname = \"flask\"\n",
+		"main.py":        "pass\n",
+	})
+	p := &testutil.MockPresenter{}
+
+	err := Run(context.Background(), dir, false, p)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(dir, "Agentfile"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "package_manager: poetry")
+}
+
+func TestRun_UVDetection(t *testing.T) {
+	dir := setupProject(t, map[string]string{
+		"pyproject.toml": "[project]\nname = \"test\"\ndependencies = [\"flask\"]\n",
+		"uv.lock":        "version = 1\n",
+		"main.py":        "pass\n",
+	})
+	p := &testutil.MockPresenter{}
+
+	err := Run(context.Background(), dir, false, p)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(dir, "Agentfile"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "package_manager: uv")
+}
+
+func TestRun_PipNoPackageManagerField(t *testing.T) {
+	dir := setupProject(t, map[string]string{
+		"requirements.txt": "flask\n",
+		"main.py":          "pass\n",
+	})
+	p := &testutil.MockPresenter{}
+
+	err := Run(context.Background(), dir, false, p)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(dir, "Agentfile"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(content), "package_manager")
+}
+
 func TestRun_LangGraphDetection(t *testing.T) {
 	dir := setupProject(t, map[string]string{
 		"requirements.txt": "langgraph>=0.1.0\n",
@@ -259,6 +306,11 @@ func TestIsPythonProject_Pyproject(t *testing.T) {
 	assert.True(t, isPythonProject(dir))
 }
 
+func TestIsPythonProject_Pipfile(t *testing.T) {
+	dir := setupProject(t, map[string]string{"Pipfile": "[packages]\nflask = \"*\"\n"})
+	assert.True(t, isPythonProject(dir))
+}
+
 func TestIsPythonProject_None(t *testing.T) {
 	dir := setupProject(t, map[string]string{"main.go": "package main\n"})
 	assert.False(t, isPythonProject(dir))
@@ -280,6 +332,53 @@ func TestWriteAgentfile_IncludesComments(t *testing.T) {
 	text := string(content)
 	assert.Contains(t, text, "# generic | langgraph")
 	assert.Contains(t, text, "# auto | custom")
+}
+
+func TestWriteAgentfile_WithPackageManager(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Agentfile")
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", PackageManager: agentfile.PackageManagerPoetry,
+		Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	require.NoError(t, writeAgentfile(path, af))
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	text := string(content)
+	assert.Contains(t, text, "package_manager: poetry")
+	assert.Contains(t, text, "# pip | poetry | uv | pipenv")
+}
+
+func TestWriteAgentfile_OmitsPipPackageManager(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Agentfile")
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", PackageManager: agentfile.PackageManagerPip,
+		Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	require.NoError(t, writeAgentfile(path, af))
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.NotContains(t, string(content), "package_manager")
+}
+
+func TestWriteAgentfile_OmitsEmptyPackageManager(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Agentfile")
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health",
+		Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	require.NoError(t, writeAgentfile(path, af))
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.NotContains(t, string(content), "package_manager")
 }
 
 func TestWriteAgentfile_WithEnv(t *testing.T) {

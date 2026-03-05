@@ -173,4 +173,61 @@ func TestNewPresenter_ReturnsModes(t *testing.T) {
 
 	p3 := NewPresenter(ModePlain)
 	assert.IsType(t, &plainPresenter{}, p3)
+
+	p4 := NewPresenter(ModeJSON)
+	assert.IsType(t, &JSONPresenter{}, p4)
+}
+
+// --- JSON Presenter tests ---
+
+func TestJSONPresenter_FlushOK(t *testing.T) {
+	var buf bytes.Buffer
+	p := &JSONPresenter{stdout: &buf}
+	p.Progress("checking docker...")
+	p.Result("deploy complete")
+	p.Flush()
+
+	assert.Contains(t, buf.String(), `"status": "ok"`)
+	assert.Contains(t, buf.String(), "checking docker...")
+	assert.Contains(t, buf.String(), "deploy complete")
+}
+
+func TestJSONPresenter_FlushError(t *testing.T) {
+	var buf bytes.Buffer
+	p := &JSONPresenter{stdout: &buf}
+	p.Error(&UserError{Code: "E101", What: "Docker not found", Fix: "Install Docker"})
+	p.Flush()
+
+	assert.Contains(t, buf.String(), `"status": "error"`)
+	assert.Contains(t, buf.String(), "E101")
+	assert.Contains(t, buf.String(), "Docker not found")
+	assert.Contains(t, buf.String(), "Install Docker")
+}
+
+func TestJSONPresenter_FlushWarning(t *testing.T) {
+	var buf bytes.Buffer
+	p := &JSONPresenter{stdout: &buf}
+	p.Warn(&UserWarning{What: "Port in use", Assumed: "8000", Override: "Change port"})
+	p.Flush()
+
+	assert.Contains(t, buf.String(), `"status": "ok"`) // warnings don't set error status
+	assert.Contains(t, buf.String(), "Port in use")
+}
+
+func TestJSONPresenter_GenericError(t *testing.T) {
+	var buf bytes.Buffer
+	p := &JSONPresenter{stdout: &buf}
+	p.Error(errors.New("something failed"))
+	p.Flush()
+
+	assert.Contains(t, buf.String(), `"status": "error"`)
+	assert.Contains(t, buf.String(), "something failed")
+}
+
+func TestJSONPresenter_EmptyOutput(t *testing.T) {
+	var buf bytes.Buffer
+	p := &JSONPresenter{stdout: &buf}
+	p.Flush()
+
+	assert.Contains(t, buf.String(), `"status": "ok"`)
 }

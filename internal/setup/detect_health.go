@@ -3,7 +3,7 @@ package setup
 import (
 	"regexp"
 
-	"github.com/antonioromero/volra/internal/output"
+	"github.com/romerox3/volra/internal/output"
 )
 
 const defaultHealthPath = "/health"

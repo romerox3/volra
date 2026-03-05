@@ -6,18 +6,22 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/antonioromero/volra/internal/output"
+	"github.com/romerox3/volra/internal/output"
 )
 
 const (
-	healthRetryInterval = 2 * time.Second
-	healthTimeout       = 60 * time.Second
+	healthRetryInterval  = 2 * time.Second
+	defaultHealthTimeout = 60 * time.Second
 )
 
 // WaitForHealth polls the agent's health endpoint until it responds with HTTP 200.
-func WaitForHealth(ctx context.Context, port int, healthPath string, name string, p output.Presenter) error {
+func WaitForHealth(ctx context.Context, port int, healthPath string, name string, timeout time.Duration, p output.Presenter) error {
+	if timeout == 0 {
+		timeout = defaultHealthTimeout
+	}
+
 	url := fmt.Sprintf("http://localhost:%d%s", port, healthPath)
-	deadline := time.Now().Add(healthTimeout)
+	deadline := time.Now().Add(timeout)
 
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
@@ -42,7 +46,7 @@ func WaitForHealth(ctx context.Context, port int, healthPath string, name string
 		if time.Now().After(deadline) || ctx.Err() != nil {
 			return &output.UserError{
 				Code: output.CodeHealthCheckFailed,
-				What: fmt.Sprintf("Health check timed out after %s — %s did not respond", healthTimeout, url),
+				What: fmt.Sprintf("Health check timed out after %s — %s did not respond", timeout, url),
 				Fix:  fmt.Sprintf("Check agent logs: docker logs %s-agent", name),
 			}
 		}
@@ -51,7 +55,7 @@ func WaitForHealth(ctx context.Context, port int, healthPath string, name string
 		case <-ctx.Done():
 			return &output.UserError{
 				Code: output.CodeHealthCheckFailed,
-				What: fmt.Sprintf("Health check timed out after %s — %s did not respond", healthTimeout, url),
+				What: fmt.Sprintf("Health check timed out after %s — %s did not respond", timeout, url),
 				Fix:  fmt.Sprintf("Check agent logs: docker logs %s-agent", name),
 			}
 		case <-time.After(healthRetryInterval):

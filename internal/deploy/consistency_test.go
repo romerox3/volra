@@ -28,6 +28,8 @@ func TestEmbeddedStatic_Exist(t *testing.T) {
 		"static/dashboards.yml",
 		"static/overview.json",
 		"static/detail.json",
+		"static/overview_metrics.json",
+		"static/detail_metrics.json",
 	}
 	for _, name := range statics {
 		t.Run(name, func(t *testing.T) {

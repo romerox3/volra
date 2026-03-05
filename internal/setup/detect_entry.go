@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/antonioromero/volra/internal/output"
+	"github.com/romerox3/volra/internal/output"
 )
 
 // entryPointCandidates is the priority-ordered list of common Python entry points.

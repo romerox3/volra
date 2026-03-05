@@ -1,6 +1,7 @@
 package output
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,8 @@ type Presenter interface {
 // NewPresenter creates a Presenter for the given mode.
 func NewPresenter(mode Mode) Presenter {
 	switch mode {
+	case ModeJSON:
+		return &JSONPresenter{stdout: os.Stdout}
 	case ModeNoColor:
 		return &noColorPresenter{stdout: os.Stdout, stderr: os.Stderr}
 	case ModePlain:
@@ -132,4 +135,68 @@ func (p *plainPresenter) Warn(w *UserWarning) {
 		return
 	}
 	writef(p.stderr, "WARNING: %s\n  -> %s\n", w.What, w.Override)
+}
+
+// --- JSON Presenter ---
+
+// JSONOutput is the structured JSON emitted by the JSON presenter.
+type JSONOutput struct {
+	Status   string       `json:"status"` // "ok" or "error"
+	Messages []string     `json:"messages,omitempty"`
+	Results  []string     `json:"results,omitempty"`
+	Warnings []JSONWarn   `json:"warnings,omitempty"`
+	Errors   []JSONErr    `json:"errors,omitempty"`
+}
+
+// JSONErr is a structured error in JSON output.
+type JSONErr struct {
+	Code string `json:"code,omitempty"`
+	What string `json:"what"`
+	Fix  string `json:"fix,omitempty"`
+}
+
+// JSONWarn is a structured warning in JSON output.
+type JSONWarn struct {
+	What     string `json:"what"`
+	Assumed  string `json:"assumed,omitempty"`
+	Override string `json:"override,omitempty"`
+}
+
+// JSONPresenter collects output and writes a single JSON object on Flush.
+type JSONPresenter struct {
+	stdout   io.Writer
+	output   JSONOutput
+}
+
+func (p *JSONPresenter) Progress(msg string) {
+	p.output.Messages = append(p.output.Messages, msg)
+}
+
+func (p *JSONPresenter) Result(msg string) {
+	p.output.Results = append(p.output.Results, msg)
+}
+
+func (p *JSONPresenter) Error(err error) {
+	var ue *UserError
+	if errors.As(err, &ue) {
+		p.output.Errors = append(p.output.Errors, JSONErr{Code: ue.Code, What: ue.What, Fix: ue.Fix})
+		return
+	}
+	p.output.Errors = append(p.output.Errors, JSONErr{What: err.Error()})
+}
+
+func (p *JSONPresenter) Warn(w *UserWarning) {
+	p.output.Warnings = append(p.output.Warnings, JSONWarn{What: w.What, Assumed: w.Assumed, Override: w.Override})
+}
+
+// Flush writes the collected JSON output to stdout.
+func (p *JSONPresenter) Flush() {
+	if len(p.output.Errors) > 0 {
+		p.output.Status = "error"
+	} else {
+		p.output.Status = "ok"
+	}
+	b, _ := json.MarshalIndent(p.output, "", "  ")
+	_, _ = p.stdout.Write(b)
+	_, _ = fmt.Fprintln(p.stdout)
 }

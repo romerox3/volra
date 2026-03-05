@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/antonioromero/volra/internal/agentfile"
+	"github.com/romerox3/volra/internal/agentfile"
 )
 
 // detectFramework scans dependency files for known framework packages.
@@ -15,6 +15,9 @@ func detectFramework(dir string) agentfile.Framework {
 		return agentfile.FrameworkLangGraph
 	}
 	if scanPyprojectToml(filepath.Join(dir, "pyproject.toml")) {
+		return agentfile.FrameworkLangGraph
+	}
+	if scanPipfile(filepath.Join(dir, "Pipfile")) {
 		return agentfile.FrameworkLangGraph
 	}
 	return agentfile.FrameworkGeneric
@@ -52,6 +55,15 @@ func scanPyprojectToml(path string) bool {
 	}
 	// Simple content scan — look for langgraph in dependency arrays.
 	// Works for both [project].dependencies and [project.optional-dependencies].
+	return strings.Contains(strings.ToLower(string(data)), "langgraph")
+}
+
+// scanPipfile checks if langgraph appears in Pipfile dependencies.
+func scanPipfile(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
 	return strings.Contains(strings.ToLower(string(data)), "langgraph")
 }
 

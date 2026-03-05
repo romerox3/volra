@@ -28,6 +28,8 @@ const (
 	CodeOOMKilled              = "E304"
 	CodeEnvNotFound            = "E305"
 	CodeDeployReserved6        = "E306"
+	CodeGPUNotAvailable        = "E307"
+	CodeGPUCheckFailed         = "E308"
 )
 
 // Error codes for status command (E4xx).

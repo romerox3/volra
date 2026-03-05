@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/antonioromero/volra/internal/agentfile"
+	"github.com/romerox3/volra/internal/agentfile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,6 +42,16 @@ func TestDetectFramework_EmptyProject(t *testing.T) {
 
 func TestDetectFramework_NonexistentDir(t *testing.T) {
 	fw := detectFramework("/nonexistent/dir")
+	assert.Equal(t, agentfile.FrameworkGeneric, fw)
+}
+
+func TestDetectFramework_LangGraphPipfile(t *testing.T) {
+	fw := detectFramework(fixture("pipfile_langgraph"))
+	assert.Equal(t, agentfile.FrameworkLangGraph, fw)
+}
+
+func TestDetectFramework_PipenvGeneric(t *testing.T) {
+	fw := detectFramework(fixture("pipenv_project"))
 	assert.Equal(t, agentfile.FrameworkGeneric, fw)
 }
 
@@ -234,6 +244,30 @@ func TestScanProject_Pyproject(t *testing.T) {
 	assert.Equal(t, "/healthz", result.HealthPath)
 	assert.Contains(t, result.EnvVars, "SECRET_KEY")
 	assert.Empty(t, result.Warnings)
+}
+
+func TestScanProject_PoetryProject(t *testing.T) {
+	result := ScanProject(fixture("poetry_project"))
+	assert.Equal(t, agentfile.FrameworkLangGraph, result.Framework)
+	assert.Equal(t, agentfile.PackageManagerPoetry, result.PackageManager)
+	assert.Equal(t, "main.py", result.EntryPoint)
+}
+
+func TestScanProject_UVProject(t *testing.T) {
+	result := ScanProject(fixture("uv_project"))
+	assert.Equal(t, agentfile.FrameworkGeneric, result.Framework)
+	assert.Equal(t, agentfile.PackageManagerUV, result.PackageManager)
+}
+
+func TestScanProject_PipenvProject(t *testing.T) {
+	result := ScanProject(fixture("pipenv_project"))
+	assert.Equal(t, agentfile.FrameworkGeneric, result.Framework)
+	assert.Equal(t, agentfile.PackageManagerPipenv, result.PackageManager)
+}
+
+func TestScanProject_PipDefault(t *testing.T) {
+	result := ScanProject(fixture("fastapi_project"))
+	assert.Equal(t, agentfile.PackageManagerPip, result.PackageManager)
 }
 
 // --- Package name extraction ---

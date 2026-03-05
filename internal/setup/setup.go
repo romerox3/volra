@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/antonioromero/volra/internal/agentfile"
-	"github.com/antonioromero/volra/internal/output"
+	"github.com/romerox3/volra/internal/agentfile"
+	"github.com/romerox3/volra/internal/output"
 )
 
 var sanitizeRegex = regexp.MustCompile(`[^a-z0-9-]`)
@@ -38,7 +38,7 @@ func Run(_ context.Context, dir string, force bool, p output.Presenter) error {
 		return &output.UserError{
 			Code: output.CodeNoPythonProject,
 			What: "No Python project detected",
-			Fix:  "Volra requires requirements.txt or pyproject.toml in the project directory",
+			Fix:  "Volra requires requirements.txt, pyproject.toml, or Pipfile in the project directory",
 		}
 	}
 
@@ -53,13 +53,14 @@ func Run(_ context.Context, dir string, force bool, p output.Presenter) error {
 	name := deriveName(absDir)
 
 	af := &agentfile.Agentfile{
-		Version:    1,
-		Name:       name,
-		Framework:  result.Framework,
-		Port:       result.Port,
-		HealthPath: result.HealthPath,
-		Env:        result.EnvVars,
-		Dockerfile: agentfile.DockerfileModeAuto,
+		Version:        1,
+		Name:           name,
+		Framework:      result.Framework,
+		Port:           result.Port,
+		HealthPath:     result.HealthPath,
+		Env:            result.EnvVars,
+		PackageManager: result.PackageManager,
+		Dockerfile:     agentfile.DockerfileModeAuto,
 	}
 
 	if err := writeAgentfile(agentfilePath, af); err != nil {
@@ -81,9 +82,9 @@ func Run(_ context.Context, dir string, force bool, p output.Presenter) error {
 	return nil
 }
 
-// isPythonProject checks for requirements.txt or pyproject.toml.
+// isPythonProject checks for Python dependency files.
 func isPythonProject(dir string) bool {
-	for _, f := range []string{"requirements.txt", "pyproject.toml"} {
+	for _, f := range []string{"requirements.txt", "pyproject.toml", "Pipfile"} {
 		if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
 			return true
 		}
@@ -116,6 +117,10 @@ func writeAgentfile(path string, af *agentfile.Agentfile) error {
 	fmt.Fprintf(&b, "framework: %s          # generic | langgraph\n", af.Framework)
 	fmt.Fprintf(&b, "port: %d\n", af.Port)
 	fmt.Fprintf(&b, "health_path: %s\n", af.HealthPath)
+
+	if af.PackageManager != "" && af.PackageManager != agentfile.PackageManagerPip {
+		fmt.Fprintf(&b, "package_manager: %s     # pip | poetry | uv | pipenv\n", af.PackageManager)
+	}
 
 	if len(af.Env) > 0 {
 		b.WriteString("env:\n")
