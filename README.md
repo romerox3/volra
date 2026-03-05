@@ -1,19 +1,29 @@
-# Volra
+<div align="center">
+  <img src="media/image/volra-hero.gif" alt="Volra" width="600">
 
-**Own your agent infrastructure.**
+  <h3>Own your agent infrastructure.</h3>
+  <p>Deploy and monitor AI agents on your own servers.<br>CLI-first · Framework-agnostic · Open-source</p>
 
-Deploy, monitor, and operate AI agents on your own servers. CLI-first, open-source, framework-agnostic.
+  <p>
+    <a href="#quick-start">Quick Start</a> ·
+    <a href="#templates">Templates</a> ·
+    <a href="docs/mcp-integration.md">MCP</a> ·
+    <a href="#contributing">Contributing</a>
+  </p>
+
+  <p>
+    <a href="https://github.com/romerox3/volra/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/romerox3/volra/ci.yml?style=flat-square&label=CI" alt="CI"></a>
+    <a href="https://github.com/romerox3/volra/releases"><img src="https://img.shields.io/github/v/release/romerox3/volra?style=flat-square" alt="Release"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
+  </p>
+</div>
 
 ---
-
-## What is Volra?
-
-Volra is a CLI tool that generates a complete production stack for your AI agent: Docker Compose + Prometheus + Grafana. One command, full monitoring, on your machine.
 
 ```
 $ volra deploy
 
-  Volra Deploy v0.1.0
+  Volra Deploy v0.2.0
 
   Generating artifacts...
     ✓ Dockerfile                → .volra/Dockerfile
@@ -32,8 +42,6 @@ $ volra deploy
   Dashboard:      http://localhost:3001
 ```
 
-**No cloud accounts. No vendor lock-in. You own everything.**
-
 ## Quick Start
 
 ### Install
@@ -41,6 +49,20 @@ $ volra deploy
 ```bash
 curl -fsSL https://raw.githubusercontent.com/romerox3/volra/main/install.sh | sh
 ```
+
+<details>
+<summary>Other install methods</summary>
+
+```bash
+# Homebrew (coming soon)
+brew install romerox3/tap/volra
+
+# From source
+git clone https://github.com/romerox3/volra.git
+cd volra && make build
+./bin/volra --version
+```
+</details>
 
 ### Deploy your agent
 
@@ -53,29 +75,60 @@ volra deploy           # Generate stack + deploy with monitoring
 
 Open `http://localhost:3001` — your agent is monitored.
 
+> [!TIP]
+> Start from a template instead: `volra quickstart` scaffolds a ready-to-deploy agent in seconds.
+
+## Templates
+
+12 built-in templates across 4 categories:
+
+| Template | Category | Services | Description |
+|----------|----------|----------|-------------|
+| `basic` | Getting Started | — | Minimal FastAPI agent with health + ask endpoints |
+| `rag` | Use Cases | Redis, ChromaDB | RAG agent with semantic search and vector DB |
+| `conversational` | Use Cases | Redis, PostgreSQL | Conversational agent with session memory and SSE streaming |
+| `api-agent` | Use Cases | — | Function-calling agent using raw tool-calling (no framework) |
+| `mcp-server` | Use Cases | — | MCP-compatible tool server for Claude Desktop, Cursor, etc. |
+| `langgraph` | Frameworks | — | LangGraph ReAct agent with tool-calling and thread memory |
+| `crewai` | Frameworks | — | CrewAI multi-agent crew with Researcher and Writer agents |
+| `openai-agents` | Frameworks | — | OpenAI Agents SDK with tools, handoffs, and specialization |
+| `smolagents` | Frameworks | — | HuggingFace code agent that writes and executes Python |
+| `discord-bot` | Platforms | Redis | AI-powered Discord bot with slash commands and rate limiting |
+| `slack-bot` | Platforms | — | Slack bot with Socket Mode and @mention responses |
+| `web-chat` | Platforms | — | Full-stack chat UI with WebSocket and dark theme |
+
+```bash
+volra quickstart               # Interactive — pick a template
+volra quickstart langgraph     # Direct — scaffold immediately
+```
+
 ## Features
 
-### What you get in 5 minutes
+- **Self-hosted, zero vendor lock-in** — Your servers, your data. No cloud accounts, no billing surprises. Deploy on any machine with Docker.
 
-- **Auto-detection** — Scans your Python project, detects framework, package manager, port, health endpoint
-- **Production stack** — Generates Dockerfile (multi-stage), Docker Compose, Prometheus config, Grafana dashboards
-- **Monitoring** — Health probes, uptime tracking, latency metrics, alerting rules
-- **LLM observability** — Token usage, cost tracking, latency percentiles via [`volra-observe`](volra-observe/)
-- **Infrastructure services** — Declare Redis, PostgreSQL, ChromaDB as services in your Agentfile
-- **Security defaults** — Read-only filesystem, dropped capabilities, per-service env isolation, auto-tmpfs
-- **Editor integration** — [MCP server](docs/mcp-integration.md) for Cursor, VS Code, Claude Code
-- **Templates** — `volra quickstart` scaffolds new projects from built-in templates
-- **Machine output** — `--json` flag for CI/CD integration
+- **Any Python framework** — LangGraph, CrewAI, OpenAI Agents, smolagents, or no framework at all. Volra deploys agents, not opinions.
 
-### What Volra generates (all human-readable, all editable)
+- **Observable by default** — Every deploy includes Prometheus + Grafana with health probes, uptime tracking, latency metrics, and alerting rules.
+
+- **LLM observability** — Level 2 adds token usage, cost tracking, and latency percentiles via [`volra-observe`](volra-observe/), a drop-in Python package that instruments OpenAI and Anthropic SDKs.
+
+- **Infrastructure as config** — Declare Redis, PostgreSQL, ChromaDB as services in your Agentfile. Volra generates the full Docker Compose stack.
+
+- **Security defaults** — Read-only filesystem, dropped capabilities, per-service env isolation, auto-tmpfs. Secure without thinking about it.
+
+- **Editor integration** — [MCP server](docs/mcp-integration.md) exposes deploy, status, logs, and doctor as tools for Cursor, VS Code, and Claude Code.
+
+## What Volra Generates
+
+Everything is human-readable, editable, and disposable:
 
 ```
 my-agent/
 ├── main.py              # Your code (unchanged)
-├── requirements.txt     # Your deps (pip, or pyproject.toml/poetry.lock/uv.lock/Pipfile)
+├── requirements.txt     # Your deps (pip, poetry, uv, or pipenv)
 ├── Agentfile            # Agent config (generated by init, you customize)
 ├── .env                 # Your secrets (gitignored)
-└── .volra/              # Generated stack (gitignored, disposable)
+└── .volra/              # Generated stack (gitignored, regenerated on each deploy)
     ├── Dockerfile
     ├── docker-compose.yml
     ├── prometheus.yml
@@ -84,11 +137,11 @@ my-agent/
     └── grafana/
 ```
 
-`.volra/` is fully regenerated on each deploy. Your Agentfile is the portable config.
+`.volra/` is fully regenerated on each deploy. Your Agentfile is the single source of truth.
 
 ## Agentfile
 
-Volra uses a declarative YAML config:
+Declarative YAML — auto-generated by `volra init`, customizable by you:
 
 ```yaml
 version: 1
@@ -96,7 +149,7 @@ name: my-agent
 framework: langgraph        # generic | langgraph
 port: 8000
 health_path: /health
-package_manager: poetry     # pip | poetry | uv | pipenv (auto-detected, omit for pip)
+package_manager: poetry     # pip | poetry | uv | pipenv (auto-detected)
 dockerfile: auto            # auto | custom
 env:
   - OPENAI_API_KEY
@@ -130,71 +183,53 @@ build:
     - /root/nltk_data
 ```
 
-Auto-generated by `volra init`, customizable by you.
-
 ## Commands
 
 | Command | What it does |
 |---------|-------------|
 | `volra doctor` | Pre-flight check: Docker, Compose, ports, Python |
-| `volra init .` | Scan project, generate Agentfile |
+| `volra init .` | Scan project, detect framework, generate Agentfile |
 | `volra deploy` | Generate stack + deploy + verify health |
 | `volra status` | Check health of deployed agent |
 | `volra logs` | Stream logs from deployed agent |
 | `volra quickstart` | Create new agent from built-in template |
 | `volra mcp` | Start [MCP server](docs/mcp-integration.md) for editor integration |
 
-## Examples
+All commands support `--json` for CI/CD integration.
 
-| Example | Framework | Services | Description |
-|---------|-----------|----------|-------------|
-| [echo-agent](examples/a1-echo) | generic | none | Minimal HTTP agent |
-| [rag-kb](examples/a4-rag-kb) | generic | Redis | RAG agent with cache |
-| [conversational](examples/a5-conversational) | langgraph | Redis + PostgreSQL | Conversational agent with memory |
+## Why Self-Hosted?
 
-## Why Volra?
+**Data sovereignty** — LLM requests, user data, and agent state stay on infrastructure you control. No third-party processing.
 
-### The problem
+**Compliance** — Meet regulatory requirements (GDPR, HIPAA, internal policies) without trusting a vendor's compliance posture.
 
-You built an AI agent. It works locally. Now you need it running 24/7 with monitoring. That means Docker, Prometheus, Grafana, health checks, security configs — a week of infrastructure work.
+**Cost predictability** — Fixed infrastructure costs instead of per-request pricing. Run as many agents as your hardware supports.
 
-### What Volra does
+**Full control** — Standard Docker Compose under the hood. You can read, edit, and understand every generated file. No black boxes.
 
-Generates the entire production stack from a 6-line config. One command. 5 minutes.
-
-### Why not Railway / Vercel / Heroku?
-
-| | Railway | Vercel | Aegra | **Volra** |
-|---|---------|--------|-------|-----------|
-| Self-hosted | No | No | Yes | **Yes** |
-| Framework-agnostic | Yes | Yes | No (LangGraph only) | **Yes** |
-| Open-source | No | No | Yes | **Yes** |
-| CLI-first | No | No | No | **Yes** |
-| You own the data | No | No | Yes | **Yes** |
-
-Volra is for developers who need production infrastructure **on their own servers** — data sovereignty, compliance, vendor independence, or just wanting full control.
-
-## What Volra is NOT
-
-- **Not a cloud platform** — Volra runs on your machine. No accounts, no billing, no vendor lock-in.
-- **Not an agent framework** — Volra deploys agents, it doesn't build them. Use LangGraph, CrewAI, or plain Python.
-- **Not magic** — Volra generates standard Docker Compose + Prometheus + Grafana. You can read, edit, and understand every file.
+> [!NOTE]
+> Volra is not a cloud platform — it's a CLI that generates production infrastructure on your machine. No accounts, no billing, no vendor lock-in. Use any framework, deploy anywhere Docker runs.
 
 ## Roadmap
 
 | Version | Focus | Status |
 |---------|-------|--------|
-| v0.1 | Deploy + monitor (doctor, init, deploy, status) | **Released** |
-| v0.2 | Templates, logs, Level 2 LLM observability, MCP server, --json | **Complete** |
+| v0.1 | Deploy + monitor (doctor, init, deploy, status) | Released |
+| v0.2 | Templates, logs, Level 2 observability, MCP server, --json | **Current** |
 | v0.3 | Framework-specific addons, multi-agent composition, auto-instrumentation | Planned |
 
 ## Requirements
 
 - Docker with Compose V2
 - Python 3.10+ (for your agent)
-- macOS ARM64, Linux AMD64/ARM64 (Ubuntu 24.04 or Debian 12)
+- macOS ARM64, Linux AMD64/ARM64
 
-## Build from source
+## Contributing
+
+Contributions welcome. Please open an issue before submitting a PR for non-trivial changes.
+
+<details>
+<summary>Build from source</summary>
 
 ```bash
 git clone https://github.com/romerox3/volra.git
@@ -202,10 +237,7 @@ cd volra
 make build
 ./bin/volra --version
 ```
-
-## Contributing
-
-Contributions welcome. Please open an issue before submitting a PR for non-trivial changes.
+</details>
 
 ```bash
 make test          # Unit tests (no Docker)
@@ -215,4 +247,4 @@ make e2e-deploy    # E2E Phase 3+4 (Docker required)
 
 ## License
 
-MIT
+[MIT](LICENSE)
