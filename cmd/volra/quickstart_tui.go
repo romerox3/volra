@@ -68,10 +68,6 @@ var (
 	validStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
 	invalidStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	successStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
-	borderStyle   = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("99")).
-			Padding(0, 1)
 )
 
 func initialTUIModel() tuiModel {
@@ -261,7 +257,7 @@ func (m tuiModel) viewSelect() string {
 				prefix = cursorStyle.Render("▸ ")
 				name = selectedStyle.Render(t.Name)
 			}
-			b.WriteString(fmt.Sprintf("%s%-20s %s\n", prefix, name, desc))
+			fmt.Fprintf(&b, "%s%-20s %s\n", prefix, name, desc)
 			idx++
 		}
 		b.WriteString("\n")
@@ -301,9 +297,9 @@ func (m tuiModel) viewName() string {
 
 	b.WriteString(titleStyle.Render("Volra Quickstart"))
 	b.WriteString("\n\n")
-	b.WriteString(fmt.Sprintf("  Template: %s\n\n", selectedStyle.Render(m.chosen.Name)))
+	fmt.Fprintf(&b, "  Template: %s\n\n", selectedStyle.Render(m.chosen.Name))
 	b.WriteString("  Project name (DNS-safe):\n")
-	b.WriteString(fmt.Sprintf("  %s\n\n", m.input.View()))
+	fmt.Fprintf(&b, "  %s\n\n", m.input.View())
 
 	// Real-time DNS validation.
 	val := strings.TrimSpace(m.input.Value())
