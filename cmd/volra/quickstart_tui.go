@@ -334,13 +334,13 @@ func (m tuiModel) viewDone() string {
 		)
 	}
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("\n  %s Created %s project in %s/\n\n",
+	fmt.Fprintf(&b, "\n  %s Created %s project in %s/\n\n",
 		successStyle.Render("✓"),
 		selectedStyle.Render(m.chosen.Name),
 		m.name,
-	))
+	)
 	b.WriteString("  Next steps:\n")
-	b.WriteString(fmt.Sprintf("    cd %s\n", m.name))
+	fmt.Fprintf(&b, "    cd %s\n", m.name)
 	b.WriteString("    volra deploy\n\n")
 	return b.String()
 }
