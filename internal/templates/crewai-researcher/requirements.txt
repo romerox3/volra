@@ -1,0 +1,4 @@
+fastapi==0.115.0
+uvicorn==0.32.0
+crewai==0.108.0
+httpx==0.28.0

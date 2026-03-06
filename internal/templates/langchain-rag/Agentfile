@@ -1,0 +1,15 @@
+version: 1
+name: {{.Name}}
+framework: langchain
+port: 8000
+health_path: /health
+health_timeout: 120
+dockerfile: auto
+env:
+  - OPENAI_API_KEY
+  - OPENAI_BASE_URL
+  - OPENAI_MODEL
+services:
+  chromadb:
+    image: chromadb/chroma:0.6.3
+    port: 8000

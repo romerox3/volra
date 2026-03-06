@@ -23,7 +23,7 @@
 ```
 $ volra deploy
 
-  Volra Deploy v0.2.0
+  Volra Deploy v0.3.0
 
   Generating artifacts...
     ✓ Dockerfile                → .volra/Dockerfile
@@ -76,7 +76,7 @@ volra deploy           # Generate stack + deploy with monitoring
 Open `http://localhost:3001` — your agent is monitored.
 
 > [!TIP]
-> Start from a template instead: `volra quickstart` scaffolds a ready-to-deploy agent in seconds.
+> Start from a template instead: `volra quickstart` opens an interactive TUI to browse templates, or use `volra quickstart basic my-agent` for direct scaffolding.
 
 ## Templates
 
@@ -98,8 +98,10 @@ Open `http://localhost:3001` — your agent is monitored.
 | `web-chat` | Platforms | — | Full-stack chat UI with WebSocket and dark theme |
 
 ```bash
-volra quickstart               # Interactive — pick a template
-volra quickstart langgraph     # Direct — scaffold immediately
+volra quickstart                       # Interactive TUI — browse, filter, select
+volra quickstart langgraph my-agent    # Direct — scaffold immediately
+volra quickstart --json                # List templates as JSON
+NO_COLOR=1 volra quickstart            # Simple numbered list fallback
 ```
 
 ## Features
@@ -215,8 +217,10 @@ All commands support `--json` for CI/CD integration.
 | Version | Focus | Status |
 |---------|-------|--------|
 | v0.1 | Deploy + monitor (doctor, init, deploy, status) | Released |
-| v0.2 | Templates, logs, Level 2 observability, MCP server, --json | **Current** |
-| v0.3 | Framework-specific addons, multi-agent composition, auto-instrumentation | Planned |
+| v0.2 | Templates, logs, Level 2 observability, MCP server, --json | Released |
+| v0.3 | Interactive TUI quickstart (Bubbletea) | **Current** |
+| v0.4 | `volra dev` (hot-reload), `volra update`, unified dashboard | Next |
+| v0.5 | Multi-agent composition, framework addons, auto-instrumentation | Planned |
 
 ## Requirements
 

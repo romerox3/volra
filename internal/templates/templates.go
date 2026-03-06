@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed basic rag conversational langgraph crewai openai-agents api-agent smolagents mcp-server discord-bot slack-bot web-chat
+//go:embed basic rag conversational langgraph crewai openai-agents api-agent smolagents mcp-server discord-bot slack-bot web-chat custom-agent fastapi-bot langchain-chatbot langchain-agent langchain-rag openai-assistant openai-swarm crewai-team crewai-researcher autogen-duo autogen-group pgvector-rag
 var content embed.FS
 
 // Category groups templates in the interactive quickstart UI.
@@ -84,6 +84,24 @@ func Available() []Template {
 		{Name: "discord-bot", Description: "AI-powered Discord bot with slash commands", Category: CategoryPlatform},
 		{Name: "slack-bot", Description: "AI-powered Slack bot with event handling", Category: CategoryPlatform},
 		{Name: "web-chat", Description: "Full-stack chat UI with WebSocket", Category: CategoryPlatform},
+
+		// New — Getting Started
+		{Name: "custom-agent", Description: "Blank canvas with TODO stubs for your own agent logic", Category: CategoryGettingStarted},
+		{Name: "fastapi-bot", Description: "SSE streaming chatbot with session memory", Category: CategoryGettingStarted},
+
+		// New — Use Cases
+		{Name: "openai-assistant", Description: "OpenAI Assistants API with threads and code interpreter", Category: CategoryUseCase},
+		{Name: "pgvector-rag", Description: "Hybrid search (vector + keyword) with pgvector", Category: CategoryUseCase},
+
+		// New — Frameworks
+		{Name: "langchain-chatbot", Description: "LangChain chatbot with ConversationBufferWindowMemory", Category: CategoryFramework},
+		{Name: "langchain-agent", Description: "LangChain AgentExecutor with ReAct tools", Category: CategoryFramework},
+		{Name: "langchain-rag", Description: "LangChain RAG with ChromaDB and OpenAI embeddings", Category: CategoryFramework},
+		{Name: "openai-swarm", Description: "Multi-agent handoffs via function calling", Category: CategoryFramework},
+		{Name: "crewai-team", Description: "3-agent dev team (PM, Dev, QA) with CrewAI", Category: CategoryFramework},
+		{Name: "crewai-researcher", Description: "Single research agent with web scraping tools", Category: CategoryFramework},
+		{Name: "autogen-duo", Description: "Two-agent coder + reviewer with AutoGen", Category: CategoryFramework},
+		{Name: "autogen-group", Description: "3+ agent group chat with approval flow", Category: CategoryFramework},
 	}
 
 	for i := range templates {

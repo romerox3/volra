@@ -88,18 +88,30 @@ func TestTemplateMetadata(t *testing.T) {
 
 func TestTemplateServicesCount(t *testing.T) {
 	expected := map[string]int{
-		"basic":          0,
-		"rag":            2, // cache + vectordb
-		"conversational": 2, // redis + postgres
-		"api-agent":      0,
-		"mcp-server":     0,
-		"langgraph":      0,
-		"crewai":         0,
-		"openai-agents":  0,
-		"smolagents":     0,
-		"discord-bot":    1, // cache
-		"slack-bot":      0,
-		"web-chat":       0,
+		"basic":              0,
+		"rag":                2, // cache + vectordb
+		"conversational":     2, // redis + postgres
+		"api-agent":          0,
+		"mcp-server":         0,
+		"langgraph":          0,
+		"crewai":             0,
+		"openai-agents":      0,
+		"smolagents":         0,
+		"discord-bot":        1, // cache
+		"slack-bot":          0,
+		"web-chat":           0,
+		"custom-agent":       0,
+		"fastapi-bot":        0,
+		"langchain-chatbot":  0,
+		"langchain-agent":    0,
+		"langchain-rag":      1, // chromadb
+		"openai-assistant":   0,
+		"openai-swarm":       0,
+		"crewai-team":        0,
+		"crewai-researcher":  0,
+		"autogen-duo":        0,
+		"autogen-group":      0,
+		"pgvector-rag":       1, // postgres
 	}
 
 	for _, tmpl := range Available() {

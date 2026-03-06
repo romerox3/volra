@@ -1,0 +1,10 @@
+version: 1
+name: {{.Name}}
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto
+env:
+  - OPENAI_API_KEY
+  - OPENAI_BASE_URL
+  - OPENAI_MODEL
