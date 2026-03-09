@@ -89,3 +89,35 @@ const (
 const (
 	CodeNoAgentfileForCompliance = "E1301"
 )
+
+// Error codes for control plane (E14xx).
+const (
+	CodeControlPlaneStartFailed = "E1401"
+	CodeControlPlaneDBFailed    = "E1402"
+	CodeMetricsProxyFailed      = "E1403"
+)
+
+// Error codes for console (E15xx).
+const (
+	CodeConsoleAssetsMissing = "E1501"
+)
+
+// Error codes for Kubernetes (E16xx).
+const (
+	CodeK8sManifestFailed = "E1601"
+	CodeKubectlNotFound   = "E1602"
+	CodeKubectlApplyFailed = "E1603"
+)
+
+// Error codes for RBAC (E17xx).
+const (
+	CodeAPIKeyCreationFailed = "E1701"
+	CodeAuthFailed           = "E1702"
+	CodeAuthzFailed          = "E1703"
+)
+
+// Error codes for federation (E18xx).
+const (
+	CodeFederationPeerUnreachable = "E1801"
+	CodeFederationAuthFailed      = "E1802"
+)

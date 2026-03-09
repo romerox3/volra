@@ -10,11 +10,15 @@ import (
 	"github.com/romerox3/volra/internal/agentfile"
 	"github.com/romerox3/volra/internal/deploy"
 	"github.com/romerox3/volra/internal/docker"
+	"github.com/romerox3/volra/internal/k8s"
 	"github.com/romerox3/volra/internal/output"
 	"github.com/spf13/cobra"
 )
 
-var dryRun bool
+var (
+	dryRun       bool
+	deployTarget string
+)
 
 var deployCmd = &cobra.Command{
 	Use:   "deploy [path]",
@@ -32,6 +36,10 @@ var deployCmd = &cobra.Command{
 			return runDryRun(dir, p)
 		}
 
+		if deployTarget == "k8s" {
+			return runDeployK8s(cmd, dir, p)
+		}
+
 		dr := docker.NewExecRunner()
 		return deploy.Run(cmd.Context(), dir, p, dr)
 	},
@@ -39,7 +47,73 @@ var deployCmd = &cobra.Command{
 
 func init() {
 	deployCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would change without deploying")
+	deployCmd.Flags().StringVar(&deployTarget, "target", "docker", "Deploy target: docker, k8s")
 	rootCmd.AddCommand(deployCmd)
+}
+
+func runDeployK8s(cmd *cobra.Command, dir string, p output.Presenter) error {
+	agentfilePath := filepath.Join(dir, "Agentfile")
+	af, err := agentfile.Load(agentfilePath)
+	if err != nil {
+		return err
+	}
+	p.Progress(fmt.Sprintf("Loaded Agentfile: %s (target: k8s)", af.Name))
+
+	// Check kubectl availability.
+	p.Progress("Checking kubectl...")
+	if err := k8s.CheckKubectl(cmd.Context()); err != nil {
+		return &output.UserError{
+			Code: output.CodeKubectlNotFound,
+			What: err.Error(),
+			Fix:  "Install kubectl and configure cluster access",
+		}
+	}
+
+	// Build K8s manifest context from Agentfile.
+	mctx := &k8s.ManifestContext{
+		Name:       af.Name,
+		Image:      fmt.Sprintf("%s:latest", af.Name),
+		Port:       af.Port,
+		HealthPath: af.HealthPath,
+		Replicas:   1,
+	}
+	for _, name := range af.Env {
+		mctx.Env = append(mctx.Env, k8s.EnvVar{Name: name, Value: ""})
+	}
+	for _, vol := range af.Volumes {
+		parts := strings.SplitN(vol, ":", 2)
+		name := strings.ReplaceAll(filepath.Base(parts[0]), "/", "-")
+		mount := parts[0]
+		if len(parts) == 2 {
+			mount = parts[1]
+		}
+		mctx.Volumes = append(mctx.Volumes, k8s.VolumeMount{Name: name, MountPath: mount})
+	}
+
+	// Generate manifests.
+	p.Progress("Generating Kubernetes manifests...")
+	if err := k8s.GenerateAll(mctx, dir); err != nil {
+		return &output.UserError{
+			Code: output.CodeK8sManifestFailed,
+			What: fmt.Sprintf("Failed to generate manifests: %v", err),
+			Fix:  "Check Agentfile configuration",
+		}
+	}
+
+	// Apply manifests.
+	manifestDir := filepath.Join(dir, ".volra", "k8s")
+	p.Progress("Applying manifests with kubectl...")
+	result, err := k8s.Apply(cmd.Context(), manifestDir)
+	if err != nil {
+		return &output.UserError{
+			Code: output.CodeKubectlApplyFailed,
+			What: err.Error(),
+			Fix:  "Check kubectl configuration and cluster access",
+		}
+	}
+
+	p.Result(fmt.Sprintf("Kubernetes deploy complete:\n%s", result))
+	return nil
 }
 
 func runDryRun(dir string, p output.Presenter) error {

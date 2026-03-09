@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Volra Console</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body x-data="app()" class="bg-gray-950 text-gray-100 min-h-screen">
+
+  <!-- Header -->
+  <header class="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <h1 class="text-xl font-bold text-white">Volra Console</h1>
+      <span class="text-xs bg-blue-900 text-blue-300 px-2 py-0.5 rounded">v1.0</span>
+    </div>
+    <div class="flex items-center gap-4 text-sm text-gray-400">
+      <span x-text="agentCount + ' agents'"></span>
+      <button @click="refresh()" class="hover:text-white transition">↻ Refresh</button>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="max-w-7xl mx-auto px-6 py-8">
+
+    <!-- Search -->
+    <div class="mb-6">
+      <input type="text" x-model="search" placeholder="Filter agents..."
+             class="w-full max-w-md bg-gray-900 border border-gray-700 rounded px-4 py-2 text-sm focus:outline-none focus:border-blue-500">
+    </div>
+
+    <!-- Agent Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="agent-grid">
+      <template x-for="agent in filteredAgents" :key="agent.name">
+        <div @click="selectAgent(agent)"
+             class="bg-gray-900 border border-gray-800 rounded-lg p-4 cursor-pointer hover:border-gray-600 transition">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-medium text-white" x-text="agent.name"></h3>
+            <span class="text-xs px-2 py-0.5 rounded"
+                  :class="statusClass(agent.status)"
+                  x-text="agent.status"></span>
+          </div>
+          <div class="text-sm text-gray-400 space-y-1">
+            <div x-show="agent.framework"><span class="text-gray-500">Framework:</span> <span x-text="agent.framework"></span></div>
+            <div x-show="agent.port"><span class="text-gray-500">Port:</span> <span x-text="agent.port"></span></div>
+            <div x-show="agent.server && agent.server !== 'local'">
+              <span class="text-xs bg-purple-900 text-purple-300 px-1.5 py-0.5 rounded" x-text="agent.server"></span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div x-show="filteredAgents.length === 0" class="col-span-full text-center text-gray-500 py-12">
+        <p x-show="agents.length === 0">No agents registered. Deploy an agent with <code class="bg-gray-800 px-1 rounded">volra deploy</code></p>
+        <p x-show="agents.length > 0">No agents match your filter.</p>
+      </div>
+    </div>
+
+    <!-- Agent Detail Modal -->
+    <div x-show="selected" x-transition class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="selected = null">
+      <div class="bg-gray-900 border border-gray-700 rounded-lg w-full max-w-2xl max-h-[80vh] overflow-y-auto p-6" x-show="selected">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-bold text-white" x-text="selected?.name"></h2>
+          <button @click="selected = null" class="text-gray-400 hover:text-white">✕</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 text-sm mb-6">
+          <div><span class="text-gray-500">Status:</span> <span :class="statusClass(selected?.status)" x-text="selected?.status"></span></div>
+          <div><span class="text-gray-500">Framework:</span> <span x-text="selected?.framework || 'generic'"></span></div>
+          <div><span class="text-gray-500">Port:</span> <span x-text="selected?.port"></span></div>
+          <div><span class="text-gray-500">Directory:</span> <span class="text-xs" x-text="selected?.dir"></span></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-3 mb-6">
+          <button @click="deployAgent(selected?.name)"
+                  class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded transition">
+            Redeploy
+          </button>
+          <button @click="stopAgent(selected?.name)"
+                  class="bg-red-600 hover:bg-red-700 text-white text-sm px-4 py-2 rounded transition">
+            Stop
+          </button>
+        </div>
+
+        <div x-show="actionMessage" class="text-sm mb-4 p-2 rounded"
+             :class="actionSuccess ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'"
+             x-text="actionMessage"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+  function app() {
+    return {
+      agents: [],
+      search: '',
+      selected: null,
+      actionMessage: '',
+      actionSuccess: false,
+
+      get agentCount() { return this.agents.length },
+
+      get filteredAgents() {
+        if (!this.search) return this.agents;
+        const q = this.search.toLowerCase();
+        return this.agents.filter(a =>
+          a.name.toLowerCase().includes(q) ||
+          (a.framework || '').toLowerCase().includes(q) ||
+          (a.server || '').toLowerCase().includes(q)
+        );
+      },
+
+      async init() { await this.refresh() },
+
+      async refresh() {
+        try {
+          const res = await fetch('/api/agents');
+          this.agents = await res.json();
+        } catch (e) { console.error('Failed to fetch agents:', e) }
+      },
+
+      selectAgent(agent) { this.selected = agent; this.actionMessage = '' },
+
+      statusClass(status) {
+        switch (status) {
+          case 'healthy': return 'bg-green-900 text-green-300';
+          case 'deploying': return 'bg-yellow-900 text-yellow-300';
+          case 'stopped': return 'bg-gray-700 text-gray-400';
+          case 'unhealthy': return 'bg-red-900 text-red-300';
+          default: return 'bg-gray-700 text-gray-400';
+        }
+      },
+
+      async deployAgent(name) {
+        try {
+          const res = await fetch(`/api/agents/${name}/deploy`, { method: 'POST' });
+          const data = await res.json();
+          this.actionMessage = data.message || 'Deploy triggered';
+          this.actionSuccess = res.ok;
+          await this.refresh();
+        } catch (e) { this.actionMessage = 'Deploy failed: ' + e.message; this.actionSuccess = false }
+      },
+
+      async stopAgent(name) {
+        try {
+          const res = await fetch(`/api/agents/${name}/stop`, { method: 'POST' });
+          const data = await res.json();
+          this.actionMessage = data.message || 'Stop triggered';
+          this.actionSuccess = res.ok;
+          await this.refresh();
+        } catch (e) { this.actionMessage = 'Stop failed: ' + e.message; this.actionSuccess = false }
+      }
+    }
+  }
+  </script>
+</body>
+</html>
