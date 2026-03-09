@@ -86,4 +86,28 @@ type Agentfile struct {
 	Build         *BuildConfig        `yaml:"build,omitempty"`
 	Observability *ObservabilityConfig `yaml:"observability,omitempty"`
 	Eval          *EvalConfig          `yaml:"eval,omitempty"`
+	Alerts        *AlertsConfig        `yaml:"alerts,omitempty"`
+}
+
+// AlertsConfig defines notification and alerting configuration.
+type AlertsConfig struct {
+	Channels []AlertChannel `yaml:"channels"`
+	Rules    []AlertRule    `yaml:"rules,omitempty"`
+}
+
+// AlertChannel defines a notification channel.
+type AlertChannel struct {
+	Type        string `yaml:"type"`                    // slack, email, webhook
+	WebhookEnv  string `yaml:"webhook_url_env,omitempty"` // env var name for Slack webhook
+	To          string `yaml:"to,omitempty"`             // email recipient
+	SMTPEnv     string `yaml:"smtp_env,omitempty"`       // env var name for SMTP config
+	URL         string `yaml:"url,omitempty"`            // webhook URL
+}
+
+// AlertRule defines a custom Prometheus alerting rule.
+type AlertRule struct {
+	Name     string `yaml:"name"`
+	Expr     string `yaml:"expr"`
+	For      string `yaml:"for,omitempty"`
+	Severity string `yaml:"severity,omitempty"`
 }

@@ -166,6 +166,21 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     networks:
       - volra
+{{- if .Alerts}}
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: {{.Name}}-alertmanager
+    restart: unless-stopped
+    ports:
+      - "{{.AlertmanagerHostPort}}:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    networks:
+      - volra
+{{- end}}
 
 volumes:
   prometheus-data:

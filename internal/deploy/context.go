@@ -46,6 +46,7 @@ type TemplateContext struct {
 	ObservabilityLevel       int
 	ObservabilityMetricsPort int
 	HasLevel2                bool
+	AlertmanagerHostPort     int
 }
 
 // JobHealth returns the Prometheus job name for health endpoint scraping.
@@ -91,6 +92,7 @@ func BuildContext(af *agentfile.Agentfile, dir string) *TemplateContext {
 		ObservabilityLevel:       obsLevel,
 		ObservabilityMetricsPort: obsMetricsPort,
 		HasLevel2:                obsLevel >= 2,
+		AlertmanagerHostPort:     9093,
 	}
 	_, err := os.Stat(filepath.Join(dir, "requirements.txt"))
 	tc.HasRequirements = err == nil

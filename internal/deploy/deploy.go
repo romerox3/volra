@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/romerox3/volra/internal/agentfile"
+	"github.com/romerox3/volra/internal/alerting"
 	"github.com/romerox3/volra/internal/docker"
 	"github.com/romerox3/volra/internal/output"
 	"github.com/romerox3/volra/internal/registry"
@@ -78,6 +79,9 @@ func Run(ctx context.Context, dir string, p output.Presenter, dr docker.DockerRu
 	p.Result(fmt.Sprintf("Agent:      http://localhost:%d", tc.AgentHostPort))
 	p.Result(fmt.Sprintf("Grafana:    http://localhost:%d", tc.GrafanaHostPort))
 	p.Result(fmt.Sprintf("Prometheus: http://localhost:%d", tc.PrometheusHostPort))
+	if af.Alerts != nil {
+		p.Result(fmt.Sprintf("Alertmanager: http://localhost:%d", tc.AlertmanagerHostPort))
+	}
 	p.Result(fmt.Sprintf("Stop:       docker compose -f %s/docker-compose.yml -p %s down", filepath.Join(dir, OutputDir), af.Name))
 
 	return nil
@@ -124,6 +128,38 @@ func GenerateAll(af *agentfile.Agentfile, tc *TemplateContext, dir string) error
 		if err := GenerateEnvFiles(af, dir); err != nil {
 			return fmt.Errorf("generating env files: %w", err)
 		}
+	}
+
+	if af.Alerts != nil {
+		if err := GenerateAlertingConfigs(af.Alerts, dir); err != nil {
+			return fmt.Errorf("generating alerting configs: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// GenerateAlertingConfigs renders alertmanager.yml and alert-rules.yml into the output dir.
+func GenerateAlertingConfigs(alerts *agentfile.AlertsConfig, dir string) error {
+	outputDir := filepath.Join(dir, OutputDir)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("creating output directory: %w", err)
+	}
+
+	amConfig, err := alerting.RenderAlertmanagerConfig(alerts)
+	if err != nil {
+		return fmt.Errorf("rendering alertmanager config: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(outputDir, "alertmanager.yml"), []byte(amConfig), 0644); err != nil {
+		return fmt.Errorf("writing alertmanager.yml: %w", err)
+	}
+
+	rulesConfig, err := alerting.RenderAlertRules(alerts)
+	if err != nil {
+		return fmt.Errorf("rendering alert rules: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(outputDir, "alert-rules.yml"), []byte(rulesConfig), 0644); err != nil {
+		return fmt.Errorf("writing alert-rules.yml: %w", err)
 	}
 
 	return nil

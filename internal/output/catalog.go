@@ -78,3 +78,14 @@ const (
 	CodeGatewayToolsFailed  = "E904"
 	CodeGatewayAgentTimeout = "E905"
 )
+
+// Error codes for marketplace command (E12xx).
+const (
+	CodeMarketplaceFetch    = "E1201"
+	CodeMarketplaceNotFound = "E1202"
+)
+
+// Error codes for compliance command (E13xx).
+const (
+	CodeNoAgentfileForCompliance = "E1301"
+)
