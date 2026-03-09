@@ -55,6 +55,21 @@ func TestDetectFramework_PipenvGeneric(t *testing.T) {
 	assert.Equal(t, agentfile.FrameworkGeneric, fw)
 }
 
+func TestDetectFramework_CrewAIRequirements(t *testing.T) {
+	fw := detectFramework(fixture("crewai_project"))
+	assert.Equal(t, agentfile.FrameworkCrewAI, fw)
+}
+
+func TestDetectFramework_CrewAIPyproject(t *testing.T) {
+	fw := detectFramework(fixture("crewai_pyproject"))
+	assert.Equal(t, agentfile.FrameworkCrewAI, fw)
+}
+
+func TestDetectFramework_LangGraphTakesPriorityOverCrewAI(t *testing.T) {
+	fw := detectFramework(fixture("langgraph_crewai"))
+	assert.Equal(t, agentfile.FrameworkLangGraph, fw)
+}
+
 // --- Entry point detection ---
 
 func TestDetectEntryPoint_MainPy(t *testing.T) {
@@ -263,6 +278,15 @@ func TestScanProject_PipenvProject(t *testing.T) {
 	result := ScanProject(fixture("pipenv_project"))
 	assert.Equal(t, agentfile.FrameworkGeneric, result.Framework)
 	assert.Equal(t, agentfile.PackageManagerPipenv, result.PackageManager)
+}
+
+func TestScanProject_CrewAI(t *testing.T) {
+	result := ScanProject(fixture("crewai_project"))
+	assert.Equal(t, agentfile.FrameworkCrewAI, result.Framework)
+	assert.Equal(t, "main.py", result.EntryPoint)
+	assert.Equal(t, 8000, result.Port)
+	assert.Equal(t, "/health", result.HealthPath)
+	assert.Contains(t, result.EnvVars, "OPENAI_API_KEY")
 }
 
 func TestScanProject_PipDefault(t *testing.T) {

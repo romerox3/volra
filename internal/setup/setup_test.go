@@ -330,7 +330,7 @@ func TestWriteAgentfile_IncludesComments(t *testing.T) {
 	content, err := os.ReadFile(path)
 	require.NoError(t, err)
 	text := string(content)
-	assert.Contains(t, text, "# generic | langgraph")
+	assert.Contains(t, text, "# generic | langgraph | crewai")
 	assert.Contains(t, text, "# auto | custom")
 }
 

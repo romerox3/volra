@@ -53,6 +53,20 @@ type Service struct {
 	Resources   *ResourceConfig    `yaml:"resources,omitempty"`
 }
 
+// EvalMetric represents a single metric to evaluate.
+type EvalMetric struct {
+	Name      string `yaml:"name"`
+	Query     string `yaml:"query"`
+	Threshold int    `yaml:"threshold"`
+	Unit      string `yaml:"unit,omitempty"`
+}
+
+// EvalConfig represents the evaluation configuration.
+type EvalConfig struct {
+	Metrics        []EvalMetric `yaml:"metrics"`
+	BaselineWindow string       `yaml:"baseline_window,omitempty"` // default "1h"
+}
+
 // Agentfile is the central configuration model for a Volra agent project.
 type Agentfile struct {
 	Version       int                `yaml:"version"`
@@ -71,4 +85,5 @@ type Agentfile struct {
 	GPU           bool                `yaml:"gpu,omitempty"`
 	Build         *BuildConfig        `yaml:"build,omitempty"`
 	Observability *ObservabilityConfig `yaml:"observability,omitempty"`
+	Eval          *EvalConfig          `yaml:"eval,omitempty"`
 }

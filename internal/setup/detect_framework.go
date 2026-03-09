@@ -10,21 +10,36 @@ import (
 )
 
 // detectFramework scans dependency files for known framework packages.
+// Detection priority: LangGraph > CrewAI > Generic.
 func detectFramework(dir string) agentfile.Framework {
-	if scanRequirementsTxt(filepath.Join(dir, "requirements.txt")) {
-		return agentfile.FrameworkLangGraph
+	depFiles := []struct {
+		path string
+		scan func(string, string) bool
+	}{
+		{filepath.Join(dir, "requirements.txt"), scanRequirementsTxtFor},
+		{filepath.Join(dir, "pyproject.toml"), scanContentFor},
+		{filepath.Join(dir, "Pipfile"), scanContentFor},
 	}
-	if scanPyprojectToml(filepath.Join(dir, "pyproject.toml")) {
-		return agentfile.FrameworkLangGraph
+
+	// Check LangGraph first (highest priority).
+	for _, df := range depFiles {
+		if df.scan(df.path, "langgraph") {
+			return agentfile.FrameworkLangGraph
+		}
 	}
-	if scanPipfile(filepath.Join(dir, "Pipfile")) {
-		return agentfile.FrameworkLangGraph
+
+	// Check CrewAI second.
+	for _, df := range depFiles {
+		if df.scan(df.path, "crewai") {
+			return agentfile.FrameworkCrewAI
+		}
 	}
+
 	return agentfile.FrameworkGeneric
 }
 
-// scanRequirementsTxt checks if langgraph appears in requirements.txt.
-func scanRequirementsTxt(path string) bool {
+// scanRequirementsTxtFor checks if a package appears in requirements.txt by exact name match.
+func scanRequirementsTxtFor(path, pkg string) bool {
 	f, err := os.Open(path)
 	if err != nil {
 		return false
@@ -34,37 +49,24 @@ func scanRequirementsTxt(path string) bool {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		// Skip comments and empty lines.
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		// Extract package name before version specifiers.
-		pkg := extractPackageName(line)
-		if strings.EqualFold(pkg, "langgraph") {
+		name := extractPackageName(line)
+		if strings.EqualFold(name, pkg) {
 			return true
 		}
 	}
 	return false
 }
 
-// scanPyprojectToml checks if langgraph appears in pyproject.toml dependencies.
-func scanPyprojectToml(path string) bool {
+// scanContentFor checks if a package name appears in a file's content (pyproject.toml, Pipfile).
+func scanContentFor(path, pkg string) bool {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
-	// Simple content scan — look for langgraph in dependency arrays.
-	// Works for both [project].dependencies and [project.optional-dependencies].
-	return strings.Contains(strings.ToLower(string(data)), "langgraph")
-}
-
-// scanPipfile checks if langgraph appears in Pipfile dependencies.
-func scanPipfile(path string) bool {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	return strings.Contains(strings.ToLower(string(data)), "langgraph")
+	return strings.Contains(strings.ToLower(string(data)), strings.ToLower(pkg))
 }
 
 // extractPackageName strips version specifiers from a requirements.txt line.

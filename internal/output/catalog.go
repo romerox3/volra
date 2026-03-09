@@ -54,3 +54,18 @@ const (
 const (
 	CodeWarnComposeWatchOld = "W601"
 )
+
+// Error codes for eval command (E7xx).
+const (
+	CodeNoBaseline            = "E701"
+	CodePrometheusUnreachable = "E702"
+	CodeInvalidEvalConfig     = "E703"
+	CodePromQLFailed          = "E704"
+	CodeEvalRegression        = "E705"
+)
+
+// Error codes for hub command (E8xx).
+const (
+	CodeNoAgentsRegistered = "E801"
+	CodeHubAlreadyRunning  = "E802"
+)

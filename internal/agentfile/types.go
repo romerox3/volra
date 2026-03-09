@@ -15,6 +15,8 @@ const (
 	FrameworkGeneric Framework = "generic"
 	// FrameworkLangGraph is the framework for LangGraph-based agents.
 	FrameworkLangGraph Framework = "langgraph"
+	// FrameworkCrewAI is the framework for CrewAI-based agents.
+	FrameworkCrewAI Framework = "crewai"
 )
 
 // UnmarshalYAML validates the framework value during YAML parsing.
@@ -24,14 +26,14 @@ func (f *Framework) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 	switch Framework(s) {
-	case FrameworkGeneric, FrameworkLangGraph:
+	case FrameworkGeneric, FrameworkLangGraph, FrameworkCrewAI:
 		*f = Framework(s)
 		return nil
 	default:
 		return &output.UserError{
 			Code: output.CodeInvalidAgentfile,
 			What: fmt.Sprintf("Invalid field: framework — %q is not a valid framework", s),
-			Fix:  "Use 'generic' or 'langgraph'",
+			Fix:  "Use 'generic', 'langgraph', or 'crewai'",
 		}
 	}
 }

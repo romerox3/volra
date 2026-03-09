@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+{{- range .Agents }}
+  - job_name: 'federate-{{ .Name }}'
+    honor_labels: true
+    metrics_path: '/federate'
+    params:
+      'match[]':
+        - '{__name__=~".+"}'
+    static_configs:
+      - targets: ['host.docker.internal:{{ .PrometheusPort }}']
+        labels:
+          agent: '{{ .Name }}'
+{{- end }}

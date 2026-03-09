@@ -1,0 +1,8 @@
+[project]
+name = "my-crewai-agent"
+version = "0.1.0"
+dependencies = [
+    "crewai>=0.28.0",
+    "crewai-tools>=0.1.0",
+    "fastapi>=0.109.0",
+]

@@ -51,6 +51,9 @@ func Validate(af *Agentfile) error {
 	if err := validateObservability(af.Observability); err != nil {
 		return err
 	}
+	if err := validateEval(af.Eval); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -419,6 +422,52 @@ func validateObservability(obs *ObservabilityConfig) error {
 				Fix:  "Use a port between 1 and 65535",
 			}
 		}
+	}
+	return nil
+}
+
+func validateEval(eval *EvalConfig) error {
+	if eval == nil {
+		return nil
+	}
+	if len(eval.Metrics) == 0 {
+		return &output.UserError{
+			Code: output.CodeInvalidAgentfile,
+			What: "Invalid field: eval.metrics — at least one metric is required",
+			Fix:  "Add metrics to the eval section with name, query, and threshold",
+		}
+	}
+	seen := make(map[string]bool)
+	for i, m := range eval.Metrics {
+		if m.Name == "" {
+			return &output.UserError{
+				Code: output.CodeInvalidAgentfile,
+				What: fmt.Sprintf("Invalid field: eval.metrics[%d].name — required", i),
+				Fix:  "Add a name to each eval metric",
+			}
+		}
+		if m.Query == "" {
+			return &output.UserError{
+				Code: output.CodeInvalidAgentfile,
+				What: fmt.Sprintf("Invalid field: eval.metrics[%d].query — required", i),
+				Fix:  fmt.Sprintf("Add a PromQL query for metric %q", m.Name),
+			}
+		}
+		if m.Threshold <= 0 {
+			return &output.UserError{
+				Code: output.CodeInvalidAgentfile,
+				What: fmt.Sprintf("Invalid field: eval.metrics[%d].threshold — must be > 0, got %d", i, m.Threshold),
+				Fix:  fmt.Sprintf("Set a positive threshold percentage for metric %q", m.Name),
+			}
+		}
+		if seen[m.Name] {
+			return &output.UserError{
+				Code: output.CodeInvalidAgentfile,
+				What: fmt.Sprintf("Invalid field: eval.metrics — duplicate metric name %q", m.Name),
+				Fix:  fmt.Sprintf("Use unique names for each eval metric"),
+			}
+		}
+		seen[m.Name] = true
 	}
 	return nil
 }

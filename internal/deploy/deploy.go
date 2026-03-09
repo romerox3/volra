@@ -11,6 +11,7 @@ import (
 	"github.com/romerox3/volra/internal/agentfile"
 	"github.com/romerox3/volra/internal/docker"
 	"github.com/romerox3/volra/internal/output"
+	"github.com/romerox3/volra/internal/registry"
 )
 
 // Run executes the full deploy pipeline:
@@ -65,7 +66,15 @@ func Run(ctx context.Context, dir string, p output.Presenter, dr docker.DockerRu
 		return err
 	}
 
-	// 8. Summary
+	// 8. Register in global agent registry
+	if err := registry.Register(af.Name, dir, tc.PrometheusHostPort, tc.AgentHostPort); err != nil {
+		p.Warn(&output.UserWarning{
+			What:    fmt.Sprintf("Could not register agent in registry: %v", err),
+			Assumed: "Agent deployed but not visible in `volra hub`",
+		})
+	}
+
+	// 9. Summary
 	p.Result(fmt.Sprintf("Agent:      http://localhost:%d", tc.AgentHostPort))
 	p.Result(fmt.Sprintf("Grafana:    http://localhost:%d", tc.GrafanaHostPort))
 	p.Result(fmt.Sprintf("Prometheus: http://localhost:%d", tc.PrometheusHostPort))

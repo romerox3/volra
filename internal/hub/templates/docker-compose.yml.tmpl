@@ -1,0 +1,38 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: volra-hub-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - hub-prometheus-data:/prometheus
+    ports:
+      - "{{ .PrometheusPort }}:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+    restart: unless-stopped
+{{- if .ExtraHosts }}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+{{- end }}
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: volra-hub-grafana
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - hub-grafana-data:/var/lib/grafana
+    ports:
+      - "{{ .GrafanaPort }}:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/unified-overview.json
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  hub-prometheus-data:
+  hub-grafana-data:
