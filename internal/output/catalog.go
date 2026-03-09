@@ -69,3 +69,12 @@ const (
 	CodeNoAgentsRegistered = "E801"
 	CodeHubAlreadyRunning  = "E802"
 )
+
+// Error codes for gateway command (E9xx).
+const (
+	CodeGatewayNoAgents     = "E901"
+	CodeGatewaySpawnFailed  = "E902"
+	CodeGatewayInitFailed   = "E903"
+	CodeGatewayToolsFailed  = "E904"
+	CodeGatewayAgentTimeout = "E905"
+)
