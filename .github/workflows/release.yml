@@ -13,33 +13,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
-      - name: Build binaries
-        run: make build-all VERSION=${{ github.ref_name }}
-
-      - name: Generate checksums
-        run: make checksums
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
         with:
-          files: |
-            bin/volra-darwin-arm64
-            bin/volra-linux-amd64
-            bin/volra-linux-arm64
-            bin/SHA256SUMS
-          generate_release_notes: true
-
-      - name: Trigger Homebrew tap update
-        if: success()
-        run: |
-          curl -fsSL -X POST \
-            -H "Authorization: Bearer ${{ secrets.TAP_DISPATCH_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/romerox3/homebrew-volra/dispatches" \
-            -d '{"event_type":"new-release","client_payload":{"version":"${{ github.ref_name }}"}}'
-        continue-on-error: true
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}

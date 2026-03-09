@@ -25,16 +25,7 @@ func Run(ctx context.Context, dir string, p output.Presenter, dr docker.DockerRu
 	p.Progress(fmt.Sprintf("Loaded Agentfile: %s", af.Name))
 
 	// 2. Validate .env exists if Agentfile declares env vars (agent or any service)
-	needsEnv := len(af.Env) > 0
-	if !needsEnv {
-		for _, svc := range af.Services {
-			if len(svc.Env) > 0 {
-				needsEnv = true
-				break
-			}
-		}
-	}
-	if needsEnv {
+	if NeedsEnv(af) {
 		envPath := filepath.Join(dir, ".env")
 		if _, err := os.Stat(envPath); os.IsNotExist(err) {
 			return &output.UserError{
@@ -50,30 +41,8 @@ func Run(ctx context.Context, dir string, p output.Presenter, dr docker.DockerRu
 
 	// 4. Generate all artifacts
 	p.Progress("Generating deploy artifacts...")
-	if af.Dockerfile == agentfile.DockerfileModeAuto {
-		if err := GenerateDockerfile(tc, dir); err != nil {
-			return fmt.Errorf("generating Dockerfile: %w", err)
-		}
-	}
-	if err := GenerateCompose(tc, dir); err != nil {
-		return fmt.Errorf("generating docker-compose.yml: %w", err)
-	}
-	if err := GeneratePrometheus(tc, dir); err != nil {
-		return fmt.Errorf("generating prometheus.yml: %w", err)
-	}
-	if err := CopyAlertRules(dir); err != nil {
-		return fmt.Errorf("copying alert_rules.yml: %w", err)
-	}
-	if err := CopyBlackboxConfig(dir); err != nil {
-		return fmt.Errorf("copying blackbox.yml: %w", err)
-	}
-	if err := CopyGrafanaAssets(dir, tc.HasMetrics, tc.HasLevel2); err != nil {
-		return fmt.Errorf("copying Grafana assets: %w", err)
-	}
-	if needsEnv {
-		if err := GenerateEnvFiles(af, dir); err != nil {
-			return fmt.Errorf("generating env files: %w", err)
-		}
+	if err := GenerateAll(af, tc, dir); err != nil {
+		return err
 	}
 	p.Progress("Artifacts generated in .volra/")
 
@@ -101,6 +70,52 @@ func Run(ctx context.Context, dir string, p output.Presenter, dr docker.DockerRu
 	p.Result(fmt.Sprintf("Grafana:    http://localhost:%d", tc.GrafanaHostPort))
 	p.Result(fmt.Sprintf("Prometheus: http://localhost:%d", tc.PrometheusHostPort))
 	p.Result(fmt.Sprintf("Stop:       docker compose -f %s/docker-compose.yml -p %s down", filepath.Join(dir, OutputDir), af.Name))
+
+	return nil
+}
+
+// NeedsEnv returns true if the Agentfile declares env vars (agent or any service).
+func NeedsEnv(af *agentfile.Agentfile) bool {
+	if len(af.Env) > 0 {
+		return true
+	}
+	for _, svc := range af.Services {
+		if len(svc.Env) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// GenerateAll generates all deployment artifacts (Dockerfile, docker-compose, Prometheus, Grafana, env files).
+// Extracted for reuse by volra dev.
+func GenerateAll(af *agentfile.Agentfile, tc *TemplateContext, dir string) error {
+	if af.Dockerfile == agentfile.DockerfileModeAuto {
+		if err := GenerateDockerfile(tc, dir); err != nil {
+			return fmt.Errorf("generating Dockerfile: %w", err)
+		}
+	}
+	if err := GenerateCompose(tc, dir); err != nil {
+		return fmt.Errorf("generating docker-compose.yml: %w", err)
+	}
+	if err := GeneratePrometheus(tc, dir); err != nil {
+		return fmt.Errorf("generating prometheus.yml: %w", err)
+	}
+	if err := CopyAlertRules(dir); err != nil {
+		return fmt.Errorf("copying alert_rules.yml: %w", err)
+	}
+	if err := CopyBlackboxConfig(dir); err != nil {
+		return fmt.Errorf("copying blackbox.yml: %w", err)
+	}
+	if err := CopyGrafanaAssets(dir, tc.HasMetrics, tc.HasLevel2); err != nil {
+		return fmt.Errorf("copying Grafana assets: %w", err)
+	}
+
+	if NeedsEnv(af) {
+		if err := GenerateEnvFiles(af, dir); err != nil {
+			return fmt.Errorf("generating env files: %w", err)
+		}
+	}
 
 	return nil
 }

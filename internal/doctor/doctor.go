@@ -121,6 +121,7 @@ func runAllChecks(ctx context.Context, r docker.DockerRunner, sys SystemInfo) []
 	results = append(results, checkDockerInstalled(ctx, r))
 	results = append(results, checkDockerRunning(ctx, r))
 	results = append(results, checkComposeV2(ctx, r))
+	results = append(results, checkComposeWatchVersion(ctx, r))
 	results = append(results, checkPython(ctx, sys))
 	results = append(results, checkDiskSpace(sys))
 	results = append(results, checkPorts(sys, 9090, 3001)...)
@@ -171,6 +172,61 @@ func checkComposeV2(ctx context.Context, r docker.DockerRunner) checkResult {
 		}
 	}
 	return checkResult{name: "compose-v2", passed: true, detail: "Docker Compose V2 available"}
+}
+
+func checkComposeWatchVersion(ctx context.Context, r docker.DockerRunner) checkResult {
+	out, err := r.Run(ctx, "compose", "version", "--short")
+	if err != nil {
+		// If compose version --short fails, skip silently — checkComposeV2 already handles missing compose.
+		return checkResult{name: "compose-watch", passed: true, detail: "Docker Compose watch check skipped"}
+	}
+
+	version := strings.TrimSpace(out)
+	if IsComposeVersionAtLeast(version, 2, 22, 0) {
+		return checkResult{name: "compose-watch", passed: true, detail: fmt.Sprintf("Docker Compose %s (watch supported)", version)}
+	}
+
+	return checkResult{
+		name: "compose-watch",
+		warn: &output.UserWarning{
+			What:     fmt.Sprintf("Docker Compose %s does not support watch (requires >= 2.22.0)", version),
+			Assumed:  "volra dev will not be available",
+			Override: "Update Docker Desktop or install docker-compose-plugin >= 2.22.0",
+		},
+	}
+}
+
+// IsComposeVersionAtLeast checks if a version string like "2.29.1" is >= the given major.minor.patch.
+func IsComposeVersionAtLeast(version string, wantMajor, wantMinor, wantPatch int) bool {
+	// Strip leading "v" if present.
+	version = strings.TrimPrefix(version, "v")
+	segments := strings.Split(version, ".")
+	if len(segments) < 2 {
+		return false
+	}
+
+	major, err := strconv.Atoi(segments[0])
+	if err != nil {
+		return false
+	}
+	minor, err := strconv.Atoi(segments[1])
+	if err != nil {
+		return false
+	}
+	patch := 0
+	if len(segments) >= 3 {
+		// Handle pre-release suffixes like "2.22.0-beta.1"
+		patchStr := strings.SplitN(segments[2], "-", 2)[0]
+		patch, _ = strconv.Atoi(patchStr)
+	}
+
+	if major != wantMajor {
+		return major > wantMajor
+	}
+	if minor != wantMinor {
+		return minor > wantMinor
+	}
+	return patch >= wantPatch
 }
 
 func checkPython(ctx context.Context, sys SystemInfo) checkResult {

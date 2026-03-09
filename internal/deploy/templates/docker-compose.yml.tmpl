@@ -12,6 +12,18 @@ services:
 {{- end}}
     container_name: {{.Name}}-agent
     restart: unless-stopped
+    develop:
+      watch:
+        - action: rebuild
+          path: ..
+          ignore:
+            - .volra/
+            - __pycache__/
+            - .git/
+            - "*.pyc"
+            - .venv/
+            - venv/
+            - .env
     ports:
       - "{{.AgentHostPort}}:{{.Port}}"
 {{- if .Env}}

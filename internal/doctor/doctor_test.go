@@ -41,9 +41,10 @@ func (m *mockSystemInfo) IsPortFree(port int) bool {
 
 func allHealthyDocker() map[string]testutil.MockResponse {
 	return map[string]testutil.MockResponse{
-		"--version":       {Output: "Docker version 27.5.1, build abc123", Err: nil},
-		"info":            {Output: "Client: Docker Engine", Err: nil},
-		"compose version": {Output: "Docker Compose version v2.32.4", Err: nil},
+		"--version":              {Output: "Docker version 27.5.1, build abc123", Err: nil},
+		"info":                   {Output: "Client: Docker Engine", Err: nil},
+		"compose version":        {Output: "Docker Compose version v2.32.4", Err: nil},
+		"compose version --short": {Output: "2.32.4", Err: nil},
 	}
 }
 
@@ -255,13 +256,90 @@ func TestIsPythonVersionOK(t *testing.T) {
 	}
 }
 
+func TestCheckComposeWatchVersion_Supported(t *testing.T) {
+	mp := &testutil.MockPresenter{}
+	mr := &testutil.MockDockerRunner{Responses: allHealthyDocker()}
+
+	err := Run(context.Background(), "", mp, mr, healthySystem())
+
+	require.NoError(t, err)
+	// Should have a progress message about watch being supported
+	foundWatch := false
+	for _, msg := range mp.ProgressCalls {
+		if assert.ObjectsAreEqual("  ✓ Docker Compose 2.32.4 (watch supported)", msg) {
+			foundWatch = true
+		}
+	}
+	assert.True(t, foundWatch, "should report compose watch supported")
+}
+
+func TestCheckComposeWatchVersion_TooOld(t *testing.T) {
+	mp := &testutil.MockPresenter{}
+	responses := allHealthyDocker()
+	responses["compose version --short"] = testutil.MockResponse{Output: "2.20.3", Err: nil}
+	mr := &testutil.MockDockerRunner{Responses: responses}
+
+	err := Run(context.Background(), "", mp, mr, healthySystem())
+
+	require.NoError(t, err, "old compose watch should warn, not fail")
+	foundWarn := false
+	for _, w := range mp.WarnCalls {
+		if w.What == "Docker Compose 2.20.3 does not support watch (requires >= 2.22.0)" {
+			foundWarn = true
+		}
+	}
+	assert.True(t, foundWarn, "should warn about old compose version for watch")
+}
+
+func TestCheckComposeWatchVersion_ExactMinimum(t *testing.T) {
+	mp := &testutil.MockPresenter{}
+	responses := allHealthyDocker()
+	responses["compose version --short"] = testutil.MockResponse{Output: "2.22.0", Err: nil}
+	mr := &testutil.MockDockerRunner{Responses: responses}
+
+	err := Run(context.Background(), "", mp, mr, healthySystem())
+
+	require.NoError(t, err)
+	// Should pass, not warn
+	for _, w := range mp.WarnCalls {
+		assert.NotContains(t, w.What, "watch", "exact minimum 2.22.0 should pass, not warn")
+	}
+}
+
+func TestIsComposeVersionAtLeast(t *testing.T) {
+	tests := []struct {
+		version string
+		want    bool
+	}{
+		{"2.32.4", true},
+		{"2.22.0", true},
+		{"2.22.1", true},
+		{"2.23.0", true},
+		{"3.0.0", true},
+		{"2.21.9", false},
+		{"2.20.3", false},
+		{"1.29.0", false},
+		{"v2.29.1", true},
+		{"2.22.0-beta.1", true},
+		{"garbage", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.version, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsComposeVersionAtLeast(tt.version, 2, 22, 0))
+		})
+	}
+}
+
 func TestRun_AllChecksRunEvenOnFailure(t *testing.T) {
 	mp := &testutil.MockPresenter{}
 	mr := &testutil.MockDockerRunner{
 		Responses: map[string]testutil.MockResponse{
-			"--version":       {Output: "", Err: errors.New("not found")},
-			"info":            {Output: "", Err: errors.New("not found")},
-			"compose version": {Output: "", Err: errors.New("not found")},
+			"--version":               {Output: "", Err: errors.New("not found")},
+			"info":                    {Output: "", Err: errors.New("not found")},
+			"compose version":         {Output: "", Err: errors.New("not found")},
+			"compose version --short": {Output: "", Err: errors.New("not found")},
 		},
 	}
 	sys := healthySystem()

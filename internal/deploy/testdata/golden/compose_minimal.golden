@@ -8,6 +8,18 @@ services:
       dockerfile: .volra/Dockerfile
     container_name: my-agent-agent
     restart: unless-stopped
+    develop:
+      watch:
+        - action: rebuild
+          path: ..
+          ignore:
+            - .volra/
+            - __pycache__/
+            - .git/
+            - "*.pyc"
+            - .venv/
+            - venv/
+            - .env
     ports:
       - "8000:8000"
     networks:

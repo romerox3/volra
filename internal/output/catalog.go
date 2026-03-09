@@ -43,3 +43,14 @@ const (
 	CodeInvalidAgentfile       = "E501"
 	CodeUnsupportedVersion     = "E502"
 )
+
+// Error codes for lifecycle commands (E6xx).
+const (
+	CodeNoDeploymentFound    = "E601"
+	CodeComposeWatchRequired = "E602"
+)
+
+// Warning codes for lifecycle commands (W6xx).
+const (
+	CodeWarnComposeWatchOld = "W601"
+)
