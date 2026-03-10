@@ -81,7 +81,8 @@ func TestRenderCompose_PortMapping(t *testing.T) {
 	tc.AgentHostPort = 3000
 	got, err := RenderCompose(tc)
 	require.NoError(t, err)
-	assert.Contains(t, got, `"3000:3000"`)
+	// Agent port is exposed via a2a-proxy, mapped as host:80 (nginx).
+	assert.Contains(t, got, `"3000:80"`)
 	assert.Contains(t, got, `"9090:9090"`)
 	assert.Contains(t, got, `"3001:3000"`)
 }
@@ -321,7 +322,8 @@ func TestRenderCompose_AgentHostPort(t *testing.T) {
 	tc.AgentHostPort = 18000
 	got, err := RenderCompose(tc)
 	require.NoError(t, err)
-	assert.Contains(t, got, `"18000:8000"`)
+	// Agent port exposed via a2a-proxy as host:80.
+	assert.Contains(t, got, `"18000:80"`)
 }
 
 // --- Resource limits compose tests ---

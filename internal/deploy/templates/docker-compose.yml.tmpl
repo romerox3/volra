@@ -24,8 +24,6 @@ services:
             - .venv/
             - venv/
             - .env
-    ports:
-      - "{{.AgentHostPort}}:{{.Port}}"
 {{- if .Env}}
     env_file:
       - ./agent.env
@@ -167,6 +165,20 @@ services:
     volumes:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - volra
+
+  a2a-proxy:
+    image: nginx:alpine
+    container_name: {{.Name}}-a2a-proxy
+    restart: unless-stopped
+    ports:
+      - "{{.AgentHostPort}}:80"
+    volumes:
+      - ./a2a-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./agent-card.json:/etc/volra/agent-card.json:ro
+    depends_on:
+      - agent
     networks:
       - volra
 {{- if .Alerts}}

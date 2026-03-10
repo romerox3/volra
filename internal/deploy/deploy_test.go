@@ -132,6 +132,7 @@ func TestRun_GeneratesArtifacts(t *testing.T) {
 		filepath.Join(dir, OutputDir, "grafana/provisioning/datasources/datasource.yml"),
 		filepath.Join(dir, OutputDir, "grafana/provisioning/dashboards/dashboards.yml"),
 		filepath.Join(dir, OutputDir, "agent-card.json"),
+		filepath.Join(dir, OutputDir, "a2a-proxy.conf"),
 	}
 	for _, path := range artifacts {
 		_, err := os.Stat(path)
@@ -160,6 +161,24 @@ func TestGenerateA2ACard(t *testing.T) {
 	assert.Contains(t, string(data), "test-agent")
 	assert.Contains(t, string(data), "http://localhost:8000")
 	assert.Contains(t, string(data), "generic")
+}
+
+func TestGenerateA2AProxy(t *testing.T) {
+	dir := t.TempDir()
+
+	tc := &TemplateContext{}
+	tc.Port = 8000
+
+	err := GenerateA2AProxy(tc, dir)
+	require.NoError(t, err)
+
+	confPath := filepath.Join(dir, OutputDir, "a2a-proxy.conf")
+	data, err := os.ReadFile(confPath)
+	require.NoError(t, err)
+	content := string(data)
+	assert.Contains(t, content, "/.well-known/agent.json")
+	assert.Contains(t, content, "proxy_pass http://agent:8000")
+	assert.Contains(t, content, "agent-card.json")
 }
 
 func TestRun_OutputSummary(t *testing.T) {
