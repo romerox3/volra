@@ -1,7 +1,7 @@
 server {
     listen 80;
 
-    location = /.well-known/agent.json {
+    location = /.well-known/agent-card.json {
         alias /etc/volra/agent-card.json;
         default_type application/json;
     }

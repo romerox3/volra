@@ -15,6 +15,7 @@ import (
 // Server is the control plane HTTP server.
 type Server struct {
 	store      *Store
+	federation *FederationClient
 	mux        *http.ServeMux
 	httpServer *http.Server
 	port       int
@@ -23,9 +24,10 @@ type Server struct {
 // NewServer creates a new control plane server.
 func NewServer(store *Store, port int) *Server {
 	s := &Server{
-		store: store,
-		mux:   http.NewServeMux(),
-		port:  port,
+		store:      store,
+		federation: NewFederationClient(),
+		mux:        http.NewServeMux(),
+		port:       port,
 	}
 	s.registerRoutes()
 	return s
@@ -36,6 +38,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /api/agents/{name}", s.handleGetAgent)
 	s.mux.HandleFunc("POST /api/agents/{name}/deploy", s.handleDeployAgent)
 	s.mux.HandleFunc("POST /api/agents/{name}/stop", s.handleStopAgent)
+	s.mux.HandleFunc("GET /api/federation/capabilities", s.handleFederationCapabilities)
 	s.mux.HandleFunc("GET /health", s.handleHealth)
 
 	// Serve console UI at root.
@@ -136,6 +139,29 @@ func (s *Server) handleStopAgent(w http.ResponseWriter, r *http.Request) {
 		"status":  "ok",
 		"message": fmt.Sprintf("agent %s stopped", name),
 	})
+}
+
+func (s *Server) handleFederationCapabilities(w http.ResponseWriter, r *http.Request) {
+	agents, err := s.store.ListAgents()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "listing agents: "+err.Error())
+		return
+	}
+	if agents == nil {
+		agents = []Agent{}
+	}
+
+	peers, err := s.store.ListPeers()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "listing peers: "+err.Error())
+		return
+	}
+
+	caps := s.federation.FetchCapabilities(r.Context(), agents, peers, "")
+	if caps == nil {
+		caps = []FederatedCapability{}
+	}
+	writeJSON(w, http.StatusOK, caps)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {

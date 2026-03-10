@@ -8,12 +8,24 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/romerox3/volra/internal/a2a"
 )
 
 // FederatedAgent is an agent with its origin server.
 type FederatedAgent struct {
 	Agent
 	Server string `json:"server"`
+}
+
+// FederatedCapability is an agent with its A2A card and status.
+type FederatedCapability struct {
+	Server    string        `json:"server"`
+	Agent     string        `json:"agent"`
+	URL       string        `json:"url"`
+	Status    string        `json:"status"` // "ok", "unreachable", "card_error"
+	Card      *a2a.AgentCard `json:"card,omitempty"`
+	Error     string        `json:"error,omitempty"`
 }
 
 // FederationClient queries remote control plane peers.
@@ -129,6 +141,87 @@ func (f *FederationClient) AggregateAgents(ctx context.Context, localAgents []Ag
 	}
 
 	return result
+}
+
+// FetchCapabilities fetches agents from all peers and their A2A cards.
+// Results are cached for 60 seconds. Unreachable peers or invalid cards
+// produce per-agent error entries, not a total failure.
+func (f *FederationClient) FetchCapabilities(ctx context.Context, localAgents []Agent, peers []FederationPeer, localURL string) []FederatedCapability {
+	var caps []FederatedCapability
+
+	// Local agents.
+	for _, ag := range localAgents {
+		agentURL := fmt.Sprintf("http://localhost:%d", ag.Port)
+		if localURL != "" {
+			agentURL = localURL
+		}
+		card, err := a2a.FetchCard(ctx, agentURL)
+		cap := FederatedCapability{
+			Server: "local",
+			Agent:  ag.Name,
+			URL:    agentURL,
+		}
+		if err != nil {
+			cap.Status = "card_error"
+			cap.Error = err.Error()
+		} else {
+			cap.Status = "ok"
+			cap.Card = card
+		}
+		caps = append(caps, cap)
+	}
+
+	if len(peers) == 0 {
+		return caps
+	}
+
+	// Fetch from peers in parallel.
+	type peerCaps struct {
+		caps []FederatedCapability
+	}
+	ch := make(chan peerCaps, len(peers))
+
+	for _, peer := range peers {
+		go func(p FederationPeer) {
+			agents, err := f.FetchRemoteAgents(ctx, p)
+			if err != nil {
+				ch <- peerCaps{caps: []FederatedCapability{{
+					Server: p.Name,
+					Agent:  "",
+					Status: "unreachable",
+					Error:  err.Error(),
+				}}}
+				return
+			}
+			var result []FederatedCapability
+			for _, ag := range agents {
+				agentURL := fmt.Sprintf("http://%s:%d", p.URL, ag.Port)
+				// Use the peer's URL host with agent port.
+				card, err := a2a.FetchCard(ctx, agentURL)
+				cap := FederatedCapability{
+					Server: p.Name,
+					Agent:  ag.Name,
+					URL:    agentURL,
+				}
+				if err != nil {
+					cap.Status = "card_error"
+					cap.Error = err.Error()
+				} else {
+					cap.Status = "ok"
+					cap.Card = card
+				}
+				result = append(result, cap)
+			}
+			ch <- peerCaps{caps: result}
+		}(peer)
+	}
+
+	for range peers {
+		pr := <-ch
+		caps = append(caps, pr.caps...)
+	}
+
+	return caps
 }
 
 // CheckPeerHealth verifies a remote peer is reachable.

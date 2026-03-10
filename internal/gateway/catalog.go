@@ -22,6 +22,10 @@ type NamespacedTool struct {
 	AgentName    string   `json:"agent_name"`
 	OriginalName string   `json:"original_name"`
 	Tool         mcp.Tool `json:"tool"`
+	// Remote fields (empty for local tools).
+	Server   string `json:"server,omitempty"`   // Federation server name.
+	AgentURL string `json:"agent_url,omitempty"` // Remote agent base URL.
+	Remote   bool   `json:"remote,omitempty"`    // True for federated tools.
 }
 
 // Catalog holds the unified tool catalog across all agents.
@@ -211,4 +215,32 @@ func BuildCatalog(ctx context.Context, agents []registry.AgentEntry, spawner MCP
 	}
 
 	return &Catalog{tools: allTools}, nil
+}
+
+// AddRemoteTools merges federated tools into the catalog.
+// Remote tools use server/agent/tool namespacing.
+func (c *Catalog) AddRemoteTools(tools []NamespacedTool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// Remove existing remote tools first (for refresh).
+	var local []NamespacedTool
+	for _, t := range c.tools {
+		if !t.Remote {
+			local = append(local, t)
+		}
+	}
+	c.tools = append(local, tools...)
+}
+
+// RemoteToolCount returns the number of remote tools in the catalog.
+func (c *Catalog) RemoteToolCount() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	count := 0
+	for _, t := range c.tools {
+		if t.Remote {
+			count++
+		}
+	}
+	return count
 }

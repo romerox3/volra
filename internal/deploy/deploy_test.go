@@ -176,7 +176,7 @@ func TestGenerateA2AProxy(t *testing.T) {
 	data, err := os.ReadFile(confPath)
 	require.NoError(t, err)
 	content := string(data)
-	assert.Contains(t, content, "/.well-known/agent.json")
+	assert.Contains(t, content, "/.well-known/agent-card.json")
 	assert.Contains(t, content, "proxy_pass http://agent:8000")
 	assert.Contains(t, content, "agent-card.json")
 }

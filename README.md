@@ -23,23 +23,27 @@
 ```
 $ volra deploy
 
-  Volra Deploy v0.3.0
+  Volra Deploy v1.1.0
 
   Generating artifacts...
     ✓ Dockerfile                → .volra/Dockerfile
     ✓ docker-compose.yml        → .volra/docker-compose.yml
     ✓ prometheus.yml            → .volra/prometheus.yml
+    ✓ alert_rules.yml           → .volra/alert_rules.yml
     ✓ grafana dashboards        → .volra/grafana/
+    ✓ agent-card.json           → .volra/agent-card.json
 
   Starting services...
     ✓ my-agent       (port 8000)    healthy
     ✓ prometheus     (port 9090)    running
     ✓ grafana        (port 3001)    running
+    ✓ alertmanager   (port 9093)    running
 
   ✅ Deploy complete (34s)
 
   Your agent:     http://localhost:8000
   Dashboard:      http://localhost:3001
+  Agent Card:     http://localhost:8000/.well-known/agent-card.json
 ```
 
 ## Quick Start
@@ -80,7 +84,7 @@ Open `http://localhost:3001` — your agent is monitored.
 
 ## Templates
 
-12 built-in templates across 4 categories:
+24 built-in templates across 4 categories:
 
 | Template | Category | Services | Description |
 |----------|----------|----------|-------------|
@@ -110,9 +114,17 @@ NO_COLOR=1 volra quickstart            # Simple numbered list fallback
 
 - **Any Python framework** — LangGraph, CrewAI, OpenAI Agents, smolagents, or no framework at all. Volra deploys agents, not opinions.
 
-- **Observable by default** — Every deploy includes Prometheus + Grafana with health probes, uptime tracking, latency metrics, and alerting rules.
+- **Observable by default** — Every deploy includes Prometheus + Grafana + Alertmanager with health probes, uptime tracking, latency metrics, and alerting rules.
 
 - **LLM observability** — Level 2 adds token usage, cost tracking, and latency percentiles via [`volra-observe`](volra-observe/), a drop-in Python package that instruments OpenAI and Anthropic SDKs.
+
+- **Control plane & console** — `volra server` provides REST API, SQLite persistence, and a built-in web console to manage all agents from one dashboard.
+
+- **Docker & Kubernetes** — Deploy to Docker Compose or Kubernetes with `--target k8s`. Auto-generated manifests with health probes and ServiceMonitors.
+
+- **RBAC & API keys** — Role-based access with admin, operator, and viewer roles. Bcrypt-hashed API keys with Bearer token authentication.
+
+- **Federation & Agent Mesh** — Connect multiple Volra instances. A2A v0.3 agent cards, cross-server tool routing via MCP gateway, unified agent catalog.
 
 - **Infrastructure as config** — Declare Redis, PostgreSQL, ChromaDB as services in your Agentfile. Volra generates the full Docker Compose stack.
 
@@ -191,10 +203,23 @@ build:
 |---------|-------------|
 | `volra doctor` | Pre-flight check: Docker, Compose, ports, Python |
 | `volra init .` | Scan project, detect framework, generate Agentfile |
-| `volra deploy` | Generate stack + deploy + verify health |
+| `volra deploy` | Generate stack + deploy + verify health (`--target docker/k8s`, `--dry-run`) |
 | `volra status` | Check health of deployed agent |
 | `volra logs` | Stream logs from deployed agent |
-| `volra quickstart` | Create new agent from built-in template |
+| `volra quickstart` | Create new agent from 24 built-in templates |
+| `volra dev` | Hot-reload development mode (Docker Compose watch) |
+| `volra down` | Stop all deployed services |
+| `volra update` | Self-update to latest release |
+| `volra eval` | Record baselines and detect regressions |
+| `volra hub` | Unified multi-agent Grafana dashboard |
+| `volra gateway` | MCP gateway with cross-agent tool routing |
+| `volra server` | Control plane with REST API and web console |
+| `volra auth` | Manage API keys (admin/operator/viewer RBAC) |
+| `volra federation` | Connect multiple Volra servers |
+| `volra agents` | List all agents across the mesh with capabilities |
+| `volra audit` | View deployment audit trail |
+| `volra marketplace` | Discover and install community templates |
+| `volra compliance` | Generate EU AI Act documentation |
 | `volra mcp` | Start [MCP server](docs/mcp-integration.md) for editor integration |
 
 All commands support `--json` for CI/CD integration.
@@ -218,9 +243,13 @@ All commands support `--json` for CI/CD integration.
 |---------|-------|--------|
 | v0.1 | Deploy + monitor (doctor, init, deploy, status) | Released |
 | v0.2 | Templates, logs, Level 2 observability, MCP server, --json | Released |
-| v0.3 | Interactive TUI quickstart (Bubbletea) | **Current** |
-| v0.4 | `volra dev` (hot-reload), `volra update`, unified dashboard | Next |
-| v0.5 | Multi-agent composition, framework addons, auto-instrumentation | Planned |
+| v0.3 | Interactive TUI quickstart (Bubbletea) | Released |
+| v0.4 | Developer loop: `volra dev`, `volra down`, Homebrew, self-update | Released |
+| v0.5 | Observability & Evaluation: `volra eval`, agent hub, CrewAI | Released |
+| v0.6 | MCP Gateway, OTel auto-instrumentation, Langfuse, A2A cards | Released |
+| v0.7 | Governance: Alertmanager, marketplace, audit, compliance | Released |
+| v1.0 | Production Platform: control plane, console, K8s, RBAC, federation | Released |
+| v1.1 | Agent Mesh: A2A v0.3, federated discovery, cross-server routing | **Current** |
 
 ## Requirements
 

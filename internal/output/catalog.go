@@ -121,3 +121,19 @@ const (
 	CodeFederationPeerUnreachable = "E1801"
 	CodeFederationAuthFailed      = "E1802"
 )
+
+// Error codes for A2A client (E19xx).
+const (
+	CodeA2ACardFetchFailed = "E1901"
+	CodeA2ACardInvalid     = "E1902"
+	CodeA2ARemoteCallFailed = "E1903"
+	CodeA2ATaskFailed       = "E1904"
+)
+
+// Error codes for agent mesh (E20xx).
+const (
+	CodeMeshToolNotFound     = "E2001"
+	CodeMeshNamespaceInvalid = "E2002"
+	CodeMeshAllUnreachable   = "E2003"
+	CodeMeshFederationDown   = "E2004"
+)

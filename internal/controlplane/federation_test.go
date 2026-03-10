@@ -140,3 +140,54 @@ func TestCheckPeerHealth_Failure(t *testing.T) {
 	err := client.CheckPeerHealth(context.Background(), "http://localhost:1")
 	assert.Error(t, err)
 }
+
+func TestFetchCapabilities_LocalOnly(t *testing.T) {
+	// A2A card server that returns a valid card.
+	cardSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/.well-known/agent-card.json" {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"name":            "test-agent",
+				"documentVersion": "0.3.0",
+				"url":             "http://localhost:8000",
+			})
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer cardSrv.Close()
+
+	client := NewFederationClient()
+	local := []Agent{{Name: "test-agent", Port: 8000, CreatedAt: time.Now().UTC()}}
+
+	caps := client.FetchCapabilities(context.Background(), local, nil, cardSrv.URL)
+
+	require.Len(t, caps, 1)
+	assert.Equal(t, "local", caps[0].Server)
+	assert.Equal(t, "test-agent", caps[0].Agent)
+	assert.Equal(t, "ok", caps[0].Status)
+	require.NotNil(t, caps[0].Card)
+	assert.Equal(t, "test-agent", caps[0].Card.Name)
+}
+
+func TestFetchCapabilities_LocalCardError(t *testing.T) {
+	client := NewFederationClient()
+	local := []Agent{{Name: "test-agent", Port: 8000, CreatedAt: time.Now().UTC()}}
+
+	// No card server running → card_error.
+	caps := client.FetchCapabilities(context.Background(), local, nil, "")
+	require.Len(t, caps, 1)
+	assert.Equal(t, "card_error", caps[0].Status)
+	assert.NotEmpty(t, caps[0].Error)
+}
+
+func TestFetchCapabilities_PeerUnreachable(t *testing.T) {
+	client := NewFederationClient()
+	client.httpClient.Timeout = 1 * time.Second
+
+	peers := []FederationPeer{{URL: "http://localhost:1", Name: "dead-peer"}}
+
+	caps := client.FetchCapabilities(context.Background(), nil, peers, "")
+	require.Len(t, caps, 1)
+	assert.Equal(t, "unreachable", caps[0].Status)
+	assert.Equal(t, "dead-peer", caps[0].Server)
+}

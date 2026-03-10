@@ -9,16 +9,26 @@ import (
 	"github.com/romerox3/volra/internal/agentfile"
 )
 
-// AgentCard represents an A2A Agent Card (/.well-known/agent.json).
-// See: https://google.github.io/A2A/specification/
+// AgentCard represents an A2A Agent Card (/.well-known/agent-card.json).
+// See: https://a2a-protocol.org/v0.3.0/specification/
 type AgentCard struct {
-	Name         string        `json:"name"`
-	Description  string        `json:"description,omitempty"`
-	URL          string        `json:"url"`
-	Version      string        `json:"version,omitempty"`
-	Capabilities *Capabilities `json:"capabilities,omitempty"`
-	Skills       []Skill       `json:"skills,omitempty"`
-	Provider     *Provider     `json:"provider,omitempty"`
+	Name              string          `json:"name"`
+	Description       string          `json:"description,omitempty"`
+	URL               string          `json:"url"`
+	Version           string          `json:"version,omitempty"`
+	DocumentVersion   string          `json:"documentVersion,omitempty"`
+	Capabilities      *Capabilities   `json:"capabilities,omitempty"`
+	Skills            []Skill         `json:"skills,omitempty"`
+	Provider          *Provider       `json:"provider,omitempty"`
+	Authentication    *Authentication `json:"authentication,omitempty"`
+	DefaultInputModes  []string       `json:"defaultInputModes,omitempty"`
+	DefaultOutputModes []string       `json:"defaultOutputModes,omitempty"`
+}
+
+// Authentication describes the authentication requirements for the agent.
+type Authentication struct {
+	Schemes  []string `json:"schemes"`
+	Required bool     `json:"required"`
 }
 
 // Capabilities describes what the agent supports.
@@ -34,6 +44,8 @@ type Skill struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
+	InputModes  []string `json:"inputModes,omitempty"`
+	OutputModes []string `json:"outputModes,omitempty"`
 }
 
 // Provider identifies who provides the agent.
@@ -43,22 +55,65 @@ type Provider struct {
 }
 
 // GenerateCard creates an A2A Agent Card from an Agentfile.
+// It auto-enriches the card with Agentfile data: framework, observability, security.
 func GenerateCard(af *agentfile.Agentfile, agentURL string) *AgentCard {
+	skills := []Skill{
+		{
+			ID:          af.Name + "-primary",
+			Name:        af.Name,
+			Description: fmt.Sprintf("AI agent deployed via Volra (framework: %s)", af.Framework),
+			Tags:        []string{string(af.Framework), "volra"},
+			InputModes:  []string{"text"},
+			OutputModes: []string{"text"},
+		},
+	}
+
+	// If observability level 2 is configured, expose metrics as a skill.
+	if af.Observability != nil && af.Observability.Level >= 2 {
+		metricsPort := af.Observability.MetricsPort
+		if metricsPort == 0 {
+			metricsPort = 9101
+		}
+		skills = append(skills, Skill{
+			ID:          af.Name + "-metrics",
+			Name:        "metrics",
+			Description: fmt.Sprintf("Prometheus metrics endpoint (port %d)", metricsPort),
+			Tags:        []string{"observability", "prometheus", "volra"},
+			InputModes:  []string{"text"},
+			OutputModes: []string{"text"},
+		})
+	}
+
 	card := &AgentCard{
-		Name:    af.Name,
-		URL:     agentURL,
-		Version: "1.0.0",
+		Name:               af.Name,
+		Description:        fmt.Sprintf("AI agent (%s) self-hosted via Volra", af.Framework),
+		URL:                agentURL,
+		Version:            "1.0.0",
+		DocumentVersion:    "0.3.0",
+		DefaultInputModes:  []string{"text"},
+		DefaultOutputModes: []string{"text"},
+		Provider: &Provider{
+			Organization: "self-hosted",
+		},
 		Capabilities: &Capabilities{
 			Streaming: false,
 		},
-		Skills: []Skill{
-			{
-				ID:          af.Name + "-primary",
-				Name:        af.Name,
-				Description: fmt.Sprintf("AI agent deployed via Volra (framework: %s)", af.Framework),
-				Tags:        []string{string(af.Framework), "volra"},
-			},
-		},
+		Skills: skills,
+	}
+
+	// Auto-apply authentication if security context is configured.
+	if af.Security != nil {
+		card = WithAuthentication(card)
+	}
+
+	return card
+}
+
+// WithAuthentication returns a copy of the card with bearer authentication configured.
+func WithAuthentication(card *AgentCard) *AgentCard {
+	card.Authentication = &Authentication{
+		Schemes:  []string{"bearer"},
+		Required: true,
 	}
 	return card
 }
@@ -75,8 +130,8 @@ func RenderJSON(card *AgentCard) (string, error) {
 // NginxLocationBlock returns an Nginx config snippet that serves the agent card
 // at /.well-known/agent.json.
 func NginxLocationBlock() string {
-	return `# A2A Agent Card
-location = /.well-known/agent.json {
+	return `# A2A Agent Card (v0.3)
+location = /.well-known/agent-card.json {
     alias /etc/volra/agent-card.json;
     default_type application/json;
 }`

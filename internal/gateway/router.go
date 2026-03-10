@@ -93,3 +93,18 @@ func ParseNamespace(namespacedName string) (agentName, toolName string, ok bool)
 	}
 	return namespacedName[:idx], namespacedName[idx+1:], true
 }
+
+// ParseThreeTierNamespace splits a three-tier namespace (server/agent/tool).
+// Returns ("", "", "", false) if the name doesn't have exactly 3 parts.
+func ParseThreeTierNamespace(namespacedName string) (server, agent, tool string, ok bool) {
+	parts := strings.SplitN(namespacedName, "/", 3)
+	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+		return "", "", "", false
+	}
+	return parts[0], parts[1], parts[2], true
+}
+
+// IsRemoteNamespace returns true if the name has 3 parts (server/agent/tool).
+func IsRemoteNamespace(name string) bool {
+	return strings.Count(name, "/") >= 2
+}

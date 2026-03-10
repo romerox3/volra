@@ -137,3 +137,39 @@ func TestParseNamespace(t *testing.T) {
 		})
 	}
 }
+
+func TestParseThreeTierNamespace(t *testing.T) {
+	tests := []struct {
+		input  string
+		server string
+		agent  string
+		tool   string
+		wantOk bool
+	}{
+		{"staging/analyst/summarize", "staging", "analyst", "summarize", true},
+		{"prod/my-agent/my-tool", "prod", "my-agent", "my-tool", true},
+		{"agent/tool", "", "", "", false},
+		{"no-separator", "", "", "", false},
+		{"//empty", "", "", "", false},
+		{"/agent/tool", "", "", "", false},
+		{"server/agent/", "", "", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			server, agent, tool, ok := ParseThreeTierNamespace(tt.input)
+			assert.Equal(t, tt.wantOk, ok)
+			if ok {
+				assert.Equal(t, tt.server, server)
+				assert.Equal(t, tt.agent, agent)
+				assert.Equal(t, tt.tool, tool)
+			}
+		})
+	}
+}
+
+func TestIsRemoteNamespace(t *testing.T) {
+	assert.True(t, IsRemoteNamespace("staging/agent/tool"))
+	assert.False(t, IsRemoteNamespace("agent/tool"))
+	assert.False(t, IsRemoteNamespace("tool"))
+}

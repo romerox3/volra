@@ -167,3 +167,62 @@ func TestCatalog_ToolsReturnsCopy(t *testing.T) {
 	// Original must be unaffected.
 	assert.Equal(t, "a", cat.tools[0].AgentName)
 }
+
+func TestCatalog_AddRemoteTools(t *testing.T) {
+	cat := &Catalog{
+		tools: []NamespacedTool{
+			{AgentName: "local-agent", Tool: mcp.Tool{Name: "local-agent/deploy"}},
+		},
+	}
+
+	remoteTools := []NamespacedTool{
+		{
+			AgentName:    "remote-agent",
+			OriginalName: "summarize",
+			Server:       "staging",
+			AgentURL:     "http://staging:8000",
+			Remote:       true,
+			Tool:         mcp.Tool{Name: "staging/remote-agent/summarize"},
+		},
+	}
+
+	cat.AddRemoteTools(remoteTools)
+
+	tools := cat.Tools()
+	assert.Len(t, tools, 2)
+	assert.Equal(t, "local-agent/deploy", tools[0].Tool.Name)
+	assert.Equal(t, "staging/remote-agent/summarize", tools[1].Tool.Name)
+	assert.True(t, tools[1].Remote)
+}
+
+func TestCatalog_AddRemoteTools_Refresh(t *testing.T) {
+	cat := &Catalog{
+		tools: []NamespacedTool{
+			{AgentName: "local", Tool: mcp.Tool{Name: "local/deploy"}},
+			{AgentName: "old-remote", Remote: true, Tool: mcp.Tool{Name: "staging/old-remote/tool"}},
+		},
+	}
+
+	newRemote := []NamespacedTool{
+		{AgentName: "new-remote", Remote: true, Tool: mcp.Tool{Name: "staging/new-remote/tool"}},
+	}
+
+	cat.AddRemoteTools(newRemote)
+
+	tools := cat.Tools()
+	assert.Len(t, tools, 2)
+	assert.Equal(t, "local/deploy", tools[0].Tool.Name)
+	assert.Equal(t, "staging/new-remote/tool", tools[1].Tool.Name)
+}
+
+func TestCatalog_RemoteToolCount(t *testing.T) {
+	cat := &Catalog{
+		tools: []NamespacedTool{
+			{AgentName: "local", Tool: mcp.Tool{Name: "local/deploy"}},
+			{AgentName: "remote", Remote: true, Tool: mcp.Tool{Name: "staging/remote/tool"}},
+			{AgentName: "remote2", Remote: true, Tool: mcp.Tool{Name: "prod/remote2/tool"}},
+		},
+	}
+
+	assert.Equal(t, 2, cat.RemoteToolCount())
+}
