@@ -30,7 +30,8 @@ func TestRegister_CreatesFileAndDir(t *testing.T) {
 	PathFunc = func() (string, error) { return path, nil }
 	t.Cleanup(func() { PathFunc = origPathFunc })
 
-	err := Register("my-agent", "/tmp/project", 9090, 8000)
+	projectDir := t.TempDir()
+	err := Register("my-agent", projectDir, 9090, 8000)
 	require.NoError(t, err)
 
 	_, err = os.Stat(path)
@@ -48,8 +49,10 @@ func TestRegister_CreatesFileAndDir(t *testing.T) {
 func TestRegister_TwoAgents(t *testing.T) {
 	setupTestRegistry(t)
 
-	require.NoError(t, Register("agent-a", "/tmp/a", 9090, 8000))
-	require.NoError(t, Register("agent-b", "/tmp/b", 9091, 8001))
+	dirA := t.TempDir()
+	dirB := t.TempDir()
+	require.NoError(t, Register("agent-a", dirA, 9090, 8000))
+	require.NoError(t, Register("agent-b", dirB, 9091, 8001))
 
 	agents, err := List()
 	require.NoError(t, err)
@@ -59,11 +62,11 @@ func TestRegister_TwoAgents(t *testing.T) {
 func TestRegister_UpdateExisting(t *testing.T) {
 	setupTestRegistry(t)
 
-	// Use absolute path since Register calls filepath.Abs
-	absDir, _ := filepath.Abs("/tmp/project")
+	projectDir := t.TempDir()
+	absDir, _ := filepath.Abs(projectDir)
 
-	require.NoError(t, Register("my-agent", "/tmp/project", 9090, 8000))
-	require.NoError(t, Register("my-agent", "/tmp/project", 9091, 8001))
+	require.NoError(t, Register("my-agent", projectDir, 9090, 8000))
+	require.NoError(t, Register("my-agent", projectDir, 9091, 8001))
 
 	agents, err := List()
 	require.NoError(t, err)
@@ -76,8 +79,10 @@ func TestRegister_UpdateExisting(t *testing.T) {
 func TestDeregister_RemovesAgent(t *testing.T) {
 	setupTestRegistry(t)
 
-	require.NoError(t, Register("agent-a", "/tmp/a", 9090, 8000))
-	require.NoError(t, Register("agent-b", "/tmp/b", 9091, 8001))
+	dirA := t.TempDir()
+	dirB := t.TempDir()
+	require.NoError(t, Register("agent-a", dirA, 9090, 8000))
+	require.NoError(t, Register("agent-b", dirB, 9091, 8001))
 
 	err := Deregister("agent-a")
 	require.NoError(t, err)
@@ -91,7 +96,8 @@ func TestDeregister_RemovesAgent(t *testing.T) {
 func TestDeregister_NonexistentIsNoOp(t *testing.T) {
 	setupTestRegistry(t)
 
-	require.NoError(t, Register("my-agent", "/tmp/project", 9090, 8000))
+	projectDir := t.TempDir()
+	require.NoError(t, Register("my-agent", projectDir, 9090, 8000))
 
 	err := Deregister("nonexistent")
 	require.NoError(t, err)
@@ -112,9 +118,10 @@ func TestList_EmptyWhenNoFile(t *testing.T) {
 func TestList_ReadsExistingFile(t *testing.T) {
 	path := setupTestRegistry(t)
 
+	projectDir := t.TempDir()
 	reg := Registry{
 		Agents: []AgentEntry{
-			{Name: "pre-existing", ProjectDir: "/tmp/pre", PrometheusPort: 9090, AgentPort: 8000, Status: "deployed"},
+			{Name: "pre-existing", ProjectDir: projectDir, PrometheusPort: 9090, AgentPort: 8000, Status: "deployed"},
 		},
 	}
 	data, _ := json.MarshalIndent(reg, "", "  ")
@@ -126,10 +133,39 @@ func TestList_ReadsExistingFile(t *testing.T) {
 	assert.Equal(t, "pre-existing", agents[0].Name)
 }
 
+func TestList_CleansStaleEntries(t *testing.T) {
+	path := setupTestRegistry(t)
+
+	// Create a real dir and a fake dir
+	realDir := t.TempDir()
+	fakeDir := filepath.Join(t.TempDir(), "nonexistent-subdir")
+
+	reg := Registry{
+		Agents: []AgentEntry{
+			{Name: "alive", ProjectDir: realDir, PrometheusPort: 9090, AgentPort: 8000, Status: "deployed"},
+			{Name: "ghost", ProjectDir: fakeDir, PrometheusPort: 9091, AgentPort: 8001, Status: "deployed"},
+		},
+	}
+	data, _ := json.MarshalIndent(reg, "", "  ")
+	require.NoError(t, os.WriteFile(path, data, 0o644))
+
+	agents, err := List()
+	require.NoError(t, err)
+	require.Len(t, agents, 1, "stale entry should be removed")
+	assert.Equal(t, "alive", agents[0].Name)
+
+	// Verify cleanup was persisted
+	data2, _ := os.ReadFile(path)
+	var reg2 Registry
+	require.NoError(t, json.Unmarshal(data2, &reg2))
+	assert.Len(t, reg2.Agents, 1, "cleanup should be persisted to disk")
+}
+
 func TestAtomicWrite(t *testing.T) {
 	path := setupTestRegistry(t)
 
-	require.NoError(t, Register("my-agent", "/tmp/project", 9090, 8000))
+	projectDir := t.TempDir()
+	require.NoError(t, Register("my-agent", projectDir, 9090, 8000))
 
 	// Verify no .tmp file remains
 	_, err := os.Stat(path + ".tmp")

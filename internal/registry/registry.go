@@ -91,13 +91,32 @@ func Deregister(name string) error {
 	return save(reg)
 }
 
-// List returns all registered agents.
+// List returns all registered agents, removing stale entries whose project
+// directories no longer exist on disk.
 func List() ([]AgentEntry, error) {
 	reg, err := load()
 	if err != nil {
 		return nil, err
 	}
-	return reg.Agents, nil
+
+	// Filter out stale entries (project dir deleted).
+	clean := make([]AgentEntry, 0, len(reg.Agents))
+	dirty := false
+	for _, a := range reg.Agents {
+		if _, err := os.Stat(a.ProjectDir); os.IsNotExist(err) {
+			dirty = true
+			continue
+		}
+		clean = append(clean, a)
+	}
+
+	// Persist cleanup if any entries were removed.
+	if dirty {
+		reg.Agents = clean
+		_ = save(reg) // best-effort
+	}
+
+	return clean, nil
 }
 
 func load() (*Registry, error) {

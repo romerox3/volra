@@ -49,9 +49,11 @@ func TestStart_NoAgentsRegistered(t *testing.T) {
 func TestStart_GeneratesArtifacts(t *testing.T) {
 	_, hubDir := setupTestHub(t)
 
-	// Register two agents.
-	require.NoError(t, registry.Register("agent-a", "/tmp/a", 9090, 8000))
-	require.NoError(t, registry.Register("agent-b", "/tmp/b", 9091, 8001))
+	// Register two agents with real directories.
+	dirA := t.TempDir()
+	dirB := t.TempDir()
+	require.NoError(t, registry.Register("agent-a", dirA, 9090, 8000))
+	require.NoError(t, registry.Register("agent-b", dirB, 9091, 8001))
 
 	mp := &testutil.MockPresenter{}
 	mr := &testutil.MockDockerRunner{
@@ -83,7 +85,8 @@ func TestStart_GeneratesArtifacts(t *testing.T) {
 func TestStart_HubAlreadyRunning(t *testing.T) {
 	_, hubDir := setupTestHub(t)
 
-	require.NoError(t, registry.Register("agent-a", "/tmp/a", 9090, 8000))
+	dirA := t.TempDir()
+	require.NoError(t, registry.Register("agent-a", dirA, 9090, 8000))
 
 	// Create compose file to simulate existing hub.
 	require.NoError(t, os.MkdirAll(hubDir, 0o755))
@@ -149,8 +152,10 @@ func TestStatus_NoAgents(t *testing.T) {
 func TestStatus_WithAgents(t *testing.T) {
 	setupTestHub(t)
 
-	require.NoError(t, registry.Register("agent-a", "/tmp/a", 9090, 8000))
-	require.NoError(t, registry.Register("agent-b", "/tmp/b", 9091, 8001))
+	dirA := t.TempDir()
+	dirB := t.TempDir()
+	require.NoError(t, registry.Register("agent-a", dirA, 9090, 8000))
+	require.NoError(t, registry.Register("agent-b", dirB, 9091, 8001))
 
 	mp := &testutil.MockPresenter{}
 	mr := &testutil.MockDockerRunner{}

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/romerox3/volra/internal/a2a"
 	"github.com/romerox3/volra/internal/agentfile"
 	"github.com/romerox3/volra/internal/alerting"
 	"github.com/romerox3/volra/internal/docker"
@@ -136,6 +137,10 @@ func GenerateAll(af *agentfile.Agentfile, tc *TemplateContext, dir string) error
 		}
 	}
 
+	if err := GenerateA2ACard(af, tc, dir); err != nil {
+		return fmt.Errorf("generating A2A agent card: %w", err)
+	}
+
 	return nil
 }
 
@@ -163,4 +168,21 @@ func GenerateAlertingConfigs(alerts *agentfile.AlertsConfig, dir string) error {
 	}
 
 	return nil
+}
+
+// GenerateA2ACard creates the A2A agent card (agent-card.json) in the output directory.
+func GenerateA2ACard(af *agentfile.Agentfile, tc *TemplateContext, dir string) error {
+	outputDir := filepath.Join(dir, OutputDir)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("creating output directory: %w", err)
+	}
+
+	agentURL := fmt.Sprintf("http://localhost:%d", tc.AgentHostPort)
+	card := a2a.GenerateCard(af, agentURL)
+	content, err := a2a.RenderJSON(card)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(filepath.Join(outputDir, "agent-card.json"), []byte(content), 0644)
 }

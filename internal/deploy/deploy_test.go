@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/romerox3/volra/internal/agentfile"
 	"github.com/romerox3/volra/internal/output"
 	"github.com/romerox3/volra/internal/testutil"
 	"github.com/stretchr/testify/assert"
@@ -130,11 +131,35 @@ func TestRun_GeneratesArtifacts(t *testing.T) {
 		filepath.Join(dir, OutputDir, "grafana/dashboards/detail.json"),
 		filepath.Join(dir, OutputDir, "grafana/provisioning/datasources/datasource.yml"),
 		filepath.Join(dir, OutputDir, "grafana/provisioning/dashboards/dashboards.yml"),
+		filepath.Join(dir, OutputDir, "agent-card.json"),
 	}
 	for _, path := range artifacts {
 		_, err := os.Stat(path)
 		assert.NoError(t, err, "expected artifact %s to exist", path)
 	}
+}
+
+func TestGenerateA2ACard(t *testing.T) {
+	dir := t.TempDir()
+
+	af := &agentfile.Agentfile{
+		Name:      "test-agent",
+		Framework: agentfile.FrameworkGeneric,
+		Port:      8000,
+	}
+	tc := &TemplateContext{
+		AgentHostPort: 8000,
+	}
+
+	err := GenerateA2ACard(af, tc, dir)
+	require.NoError(t, err)
+
+	cardPath := filepath.Join(dir, OutputDir, "agent-card.json")
+	data, err := os.ReadFile(cardPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "test-agent")
+	assert.Contains(t, string(data), "http://localhost:8000")
+	assert.Contains(t, string(data), "generic")
 }
 
 func TestRun_OutputSummary(t *testing.T) {

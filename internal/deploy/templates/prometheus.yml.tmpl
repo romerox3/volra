@@ -34,5 +34,5 @@ scrape_configs:
     scrape_interval: 15s
     static_configs:
       - targets:
-          - {{.Name}}:{{.ObservabilityMetricsPort}}
+          - agent:{{.ObservabilityMetricsPort}}
 {{- end}}
