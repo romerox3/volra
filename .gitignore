@@ -8,3 +8,5 @@ CLAUDE.md
 _bmad-output/
 test-polyglot-agent/
 __pycache__/
+tests/e2e/FINDINGS.md
+tests/e2e/PARTY-MODE-CONSENSUS.md
