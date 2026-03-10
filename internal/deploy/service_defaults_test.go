@@ -50,6 +50,35 @@ func TestResolveHealthcheck_ExplicitOverride(t *testing.T) {
 	assert.Equal(t, "10s", hc.Interval)
 }
 
+func TestResolveHealthcheck_ExplicitWithoutCMDPrefix(t *testing.T) {
+	explicit := &agentfile.HealthcheckConfig{
+		Test:     []string{"redis-cli", "ping"},
+		Interval: "10s", Timeout: "5s", Retries: 3,
+	}
+	hc := resolveHealthcheck("redis:7-alpine", explicit)
+	require.NotNil(t, hc)
+	assert.Equal(t, []string{"CMD", "redis-cli", "ping"}, hc.Test)
+}
+
+func TestEnsureCMDPrefix(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []string
+		out  []string
+	}{
+		{"already CMD", []string{"CMD", "check"}, []string{"CMD", "check"}},
+		{"already CMD-SHELL", []string{"CMD-SHELL", "check"}, []string{"CMD-SHELL", "check"}},
+		{"already NONE", []string{"NONE"}, []string{"NONE"}},
+		{"missing prefix", []string{"pg_isready", "-U", "cortex"}, []string{"CMD", "pg_isready", "-U", "cortex"}},
+		{"empty", []string{}, []string{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.out, ensureCMDPrefix(tt.in))
+		})
+	}
+}
+
 // --- resolveResources tests ---
 
 func TestResolveResources_Postgres(t *testing.T) {

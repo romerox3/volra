@@ -58,12 +58,25 @@ func imageMatchesPrefix(image, prefix string) bool {
 	return false
 }
 
+// ensureCMDPrefix adds "CMD" prefix to healthcheck test arrays if not already present.
+// Docker Compose requires test arrays to start with "CMD", "CMD-SHELL", or "NONE".
+func ensureCMDPrefix(test []string) []string {
+	if len(test) == 0 {
+		return test
+	}
+	first := strings.ToUpper(test[0])
+	if first == "CMD" || first == "CMD-SHELL" || first == "NONE" {
+		return test
+	}
+	return append([]string{"CMD"}, test...)
+}
+
 // resolveHealthcheck returns a healthcheck for the given image.
 // Explicit config takes priority; otherwise uses known defaults.
 func resolveHealthcheck(image string, explicit *agentfile.HealthcheckConfig) *DeployHealthcheck {
 	if explicit != nil {
 		return &DeployHealthcheck{
-			Test:        explicit.Test,
+			Test:        ensureCMDPrefix(explicit.Test),
 			Interval:    explicit.Interval,
 			Timeout:     explicit.Timeout,
 			Retries:     explicit.Retries,
