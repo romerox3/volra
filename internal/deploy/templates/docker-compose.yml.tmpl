@@ -105,7 +105,9 @@ services:
       interval: {{.Healthcheck.Interval}}
       timeout: {{.Healthcheck.Timeout}}
       retries: {{.Healthcheck.Retries}}
+{{- if .Healthcheck.StartPeriod}}
       start_period: {{.Healthcheck.StartPeriod}}
+{{- end}}
 {{- end}}
 {{- if .Resources}}
     deploy:
