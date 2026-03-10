@@ -143,6 +143,18 @@ func runDryRun(dir string, p output.Presenter) error {
 	}
 	defer os.RemoveAll(tempDir)
 
+	// Copy .env to temp dir so GenerateEnvFiles can read it
+	if deploy.NeedsEnv(af) {
+		srcEnv := filepath.Join(dir, ".env")
+		data, err := os.ReadFile(srcEnv)
+		if err != nil {
+			return fmt.Errorf("reading .env for dry-run: %w", err)
+		}
+		if err := os.WriteFile(filepath.Join(tempDir, ".env"), data, 0600); err != nil {
+			return fmt.Errorf("copying .env to temp dir: %w", err)
+		}
+	}
+
 	p.Progress("Generating artifacts to temp directory...")
 	if err := deploy.GenerateAll(af, tc, tempDir); err != nil {
 		return err
