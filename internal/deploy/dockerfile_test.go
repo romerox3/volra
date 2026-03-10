@@ -73,6 +73,7 @@ func TestRenderDockerfile_WithBuild(t *testing.T) {
 		},
 		CacheDirs: []string{"/root/nltk_data", "/root/.cache/huggingface"},
 	}
+	tc.RuntimeCacheDirs = filterRuntimeCacheDirs(tc.Build.CacheDirs, tc.PackageManager)
 	got, err := RenderDockerfile(tc)
 	require.NoError(t, err)
 	testutil.AssertGolden(t, got, filepath.Join("testdata", "golden", "dockerfile_build.golden"))

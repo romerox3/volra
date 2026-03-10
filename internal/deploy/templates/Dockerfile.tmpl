@@ -50,10 +50,8 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 {{- else}}
 COPY --from=builder /install /usr/local
 {{- end}}
-{{- if .Build}}
-{{- range .Build.CacheDirs}}
+{{- range .RuntimeCacheDirs}}
 COPY --from=builder {{.}} {{.}}
-{{- end}}
 {{- end}}
 
 COPY . .

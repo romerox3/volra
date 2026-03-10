@@ -40,6 +40,9 @@ type TemplateContext struct {
 	AgentHostPort      int // resolved: host_port || port
 	PrometheusHostPort int
 	GrafanaHostPort    int
+	// RuntimeCacheDirs are cache_dirs that need to be copied from builder to runtime.
+	// Package manager caches (pip, uv, poetry, pipenv) are excluded since they're handled by --mount=type=cache.
+	RuntimeCacheDirs []string
 	// SecurityTmpfs holds the resolved tmpfs mounts (auto-injected if read_only + no explicit tmpfs).
 	SecurityTmpfs []agentfile.TmpfsMount
 	// Observability Level 2 fields.
@@ -96,6 +99,11 @@ func BuildContext(af *agentfile.Agentfile, dir string) *TemplateContext {
 	}
 	_, err := os.Stat(filepath.Join(dir, "requirements.txt"))
 	tc.HasRequirements = err == nil
+
+	// Filter cache_dirs: exclude package manager caches (handled by --mount=type=cache)
+	if af.Build != nil {
+		tc.RuntimeCacheDirs = filterRuntimeCacheDirs(af.Build.CacheDirs, tc.PackageManager)
+	}
 
 	// Auto-inject tmpfs for read_only containers
 	if af.Security != nil && af.Security.ReadOnly {
@@ -208,6 +216,32 @@ func detectDeployPackageManager(af *agentfile.Agentfile, dir string) string {
 		return "pipenv"
 	}
 	return "pip"
+}
+
+// pkgManagerCachePaths maps package managers to their cache directories.
+// These are already handled by --mount=type=cache in the builder stage.
+var pkgManagerCachePaths = map[string]string{
+	"pip":    "/root/.cache/pip",
+	"uv":     "/root/.cache/uv",
+	"poetry": "/root/.cache/pypoetry",
+	"pipenv": "/root/.cache/pipenv",
+}
+
+// filterRuntimeCacheDirs returns cache_dirs that are NOT package manager caches.
+// Package manager caches are ephemeral build caches handled by --mount=type=cache.
+// Remaining dirs (e.g. nltk_data, huggingface) contain model data needed at runtime.
+func filterRuntimeCacheDirs(cacheDirs []string, pkgManager string) []string {
+	if len(cacheDirs) == 0 {
+		return nil
+	}
+	excludePath := pkgManagerCachePaths[pkgManager]
+	var result []string
+	for _, dir := range cacheDirs {
+		if dir != excludePath {
+			result = append(result, dir)
+		}
+	}
+	return result
 }
 
 // detectMetricsLibrary checks if the project uses prometheus_client for custom metrics.
