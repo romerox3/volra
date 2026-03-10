@@ -76,6 +76,7 @@ type Agentfile struct {
 	HostPort      int                `yaml:"host_port,omitempty"`
 	HealthPath    string             `yaml:"health_path"`
 	HealthTimeout int                `yaml:"health_timeout,omitempty"`
+	Entrypoint    string             `yaml:"entrypoint,omitempty"`
 	Volumes       []string           `yaml:"volumes,omitempty"`
 	Env           []string           `yaml:"env,omitempty"`
 	PackageManager PackageManager    `yaml:"package_manager,omitempty"`

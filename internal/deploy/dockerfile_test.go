@@ -122,6 +122,44 @@ func TestRenderDockerfile_WithBuildNoCacheDirs(t *testing.T) {
 
 // --- BuildContext tests ---
 
+func TestResolveEntryPoint_FromAgentfile(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+		Entrypoint: "agent/main.py",
+	}
+	result := resolveEntryPoint(af, dir)
+	assert.Equal(t, "agent/main.py", result)
+}
+
+func TestResolveEntryPoint_FallsBackToDetection(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+	}
+	result := resolveEntryPoint(af, dir)
+	assert.Equal(t, "app.py", result)
+}
+
+func TestBuildContext_WithEntrypoint(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.py"), []byte("pass\n"), 0644))
+
+	af := &agentfile.Agentfile{
+		Version: 1, Name: "test", Framework: agentfile.FrameworkGeneric,
+		Port: 8000, HealthPath: "/health", Dockerfile: agentfile.DockerfileModeAuto,
+		Entrypoint: "src/server.py",
+	}
+	tc := BuildContext(af, dir)
+	assert.Equal(t, "src/server.py", tc.EntryPoint)
+}
+
 func TestBuildContext_WithRequirements(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("flask\n"), 0644))

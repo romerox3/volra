@@ -33,6 +33,7 @@ services:
   my-agent-db:
     image: postgres:16
     container_name: my-agent-db
+    hostname: db
     restart: unless-stopped
     ports:
       - "5432:5432"
@@ -46,6 +47,7 @@ services:
   my-agent-redis:
     image: redis:7-alpine
     container_name: my-agent-redis
+    hostname: redis
     restart: unless-stopped
     networks:
       - volra

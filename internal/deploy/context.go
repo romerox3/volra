@@ -84,7 +84,7 @@ func BuildContext(af *agentfile.Agentfile, dir string) *TemplateContext {
 	tc := &TemplateContext{
 		Agentfile:                *af,
 		PythonVersion:            detectPythonVersion(dir),
-		EntryPoint:               detectDeployEntryPoint(dir),
+		EntryPoint:               resolveEntryPoint(af, dir),
 		PackageManager:           detectDeployPackageManager(af, dir),
 		HasMetrics:               detectMetricsLibrary(dir),
 		VolumeSpecs:              buildVolumeSpecs(af.Name, af.Volumes),
@@ -147,6 +147,15 @@ func detectPythonVersion(dir string) string {
 		}
 	}
 	return "3.11"
+}
+
+// resolveEntryPoint returns the entrypoint from the Agentfile if set,
+// otherwise falls back to auto-detection.
+func resolveEntryPoint(af *agentfile.Agentfile, dir string) string {
+	if af.Entrypoint != "" {
+		return af.Entrypoint
+	}
+	return detectDeployEntryPoint(dir)
 }
 
 // detectDeployEntryPoint finds the entry point at deploy time.

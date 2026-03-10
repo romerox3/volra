@@ -84,6 +84,7 @@ services:
   {{$.Name}}-{{.Name}}:
     image: {{.Image}}
     container_name: {{$.Name}}-{{.Name}}
+    hostname: {{.Name}}
     restart: unless-stopped
 {{- if gt .HostPort 0}}
     ports:

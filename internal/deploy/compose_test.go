@@ -473,6 +473,18 @@ func TestRenderCompose_EnvFilePath_Agent(t *testing.T) {
 	assert.Contains(t, got, "./agent.env")
 }
 
+func TestRenderCompose_ServiceHostname(t *testing.T) {
+	tc := minimalTC("my-agent", 8000)
+	tc.ServiceContexts = []ServiceContext{
+		{Name: "redis", Image: "redis:7-alpine"},
+		{Name: "postgres", Image: "postgres:16"},
+	}
+	got, err := RenderCompose(tc)
+	require.NoError(t, err)
+	assert.Contains(t, got, "hostname: redis")
+	assert.Contains(t, got, "hostname: postgres")
+}
+
 func TestRenderCompose_EnvFilePath_Service(t *testing.T) {
 	tc := minimalTC("test", 8000)
 	tc.ServiceContexts = []ServiceContext{

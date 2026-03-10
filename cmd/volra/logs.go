@@ -54,8 +54,8 @@ func runLogs(cmd *cobra.Command, args []string) error {
 		// User specified a service name — prefix with agent name.
 		composeArgs = append(composeArgs, af.Name+"-"+args[0])
 	} else {
-		// Default: the agent container.
-		composeArgs = append(composeArgs, af.Name)
+		// Default: the agent container (compose service name is "agent").
+		composeArgs = append(composeArgs, "agent")
 	}
 
 	// Stream directly to stdout/stderr (don't capture output).
