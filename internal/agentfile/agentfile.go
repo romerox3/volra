@@ -88,6 +88,33 @@ type Agentfile struct {
 	Observability *ObservabilityConfig `yaml:"observability,omitempty"`
 	Eval          *EvalConfig          `yaml:"eval,omitempty"`
 	Alerts        *AlertsConfig        `yaml:"alerts,omitempty"`
+	A2A           *A2AConfig           `yaml:"a2a,omitempty"`
+}
+
+// A2AMode represents the A2A proxy operation mode.
+type A2AMode string
+
+const (
+	A2AModeDefault     A2AMode = "default"
+	A2AModeDeclarative A2AMode = "declarative"
+	A2AModePassthrough A2AMode = "passthrough"
+)
+
+// A2AConfig represents the A2A sidecar proxy configuration.
+type A2AConfig struct {
+	Mode   A2AMode    `yaml:"mode,omitempty"`
+	Skills []A2ASkill `yaml:"skills,omitempty"`
+}
+
+// A2ASkill maps a skill ID to an agent HTTP endpoint.
+type A2ASkill struct {
+	ID            string `yaml:"id"`
+	Name          string `yaml:"name"`
+	Description   string `yaml:"description,omitempty"`
+	Endpoint      string `yaml:"endpoint"`
+	Method        string `yaml:"method,omitempty"`
+	RequestField  string `yaml:"request_field,omitempty"`
+	ResponseField string `yaml:"response_field,omitempty"`
 }
 
 // AlertsConfig defines notification and alerting configuration.

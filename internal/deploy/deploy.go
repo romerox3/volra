@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
-	"text/template"
 	"time"
 
 	"github.com/romerox3/volra/internal/a2a"
@@ -143,10 +141,6 @@ func GenerateAll(af *agentfile.Agentfile, tc *TemplateContext, dir string) error
 		return fmt.Errorf("generating A2A agent card: %w", err)
 	}
 
-	if err := GenerateA2AProxy(tc, dir); err != nil {
-		return fmt.Errorf("generating A2A proxy config: %w", err)
-	}
-
 	return nil
 }
 
@@ -193,27 +187,3 @@ func GenerateA2ACard(af *agentfile.Agentfile, tc *TemplateContext, dir string) e
 	return os.WriteFile(filepath.Join(outputDir, "agent-card.json"), []byte(content), 0644)
 }
 
-// GenerateA2AProxy renders the nginx reverse proxy config for A2A agent card serving.
-func GenerateA2AProxy(tc *TemplateContext, dir string) error {
-	tmplData, err := templateFS.ReadFile("templates/a2a-proxy.conf.tmpl")
-	if err != nil {
-		return fmt.Errorf("reading a2a-proxy template: %w", err)
-	}
-
-	tmpl, err := template.New("a2a-proxy").Parse(string(tmplData))
-	if err != nil {
-		return fmt.Errorf("parsing a2a-proxy template: %w", err)
-	}
-
-	var buf strings.Builder
-	if err := tmpl.Execute(&buf, tc); err != nil {
-		return fmt.Errorf("rendering a2a-proxy config: %w", err)
-	}
-
-	outputDir := filepath.Join(dir, OutputDir)
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return fmt.Errorf("creating output directory: %w", err)
-	}
-
-	return os.WriteFile(filepath.Join(outputDir, "a2a-proxy.conf"), []byte(buf.String()), 0644)
-}

@@ -190,9 +190,14 @@ func (s *Store) UpdateAgentStatus(name, status string) error {
 // legacyRegistryEntry mirrors the existing ~/.volra/agents.json format.
 type legacyRegistryEntry struct {
 	Name           string `json:"name"`
-	Dir            string `json:"dir"`
+	Dir            string `json:"project_dir"`
 	PrometheusPort int    `json:"prometheus_port"`
 	AgentPort      int    `json:"agent_port"`
+}
+
+// legacyRegistryFile wraps the agents array in the JSON file.
+type legacyRegistryFile struct {
+	Agents []legacyRegistryEntry `json:"agents"`
 }
 
 // ImportFromLegacyRegistry reads ~/.volra/agents.json and imports agents into SQLite.
@@ -205,8 +210,12 @@ func (s *Store) ImportFromLegacyRegistry(registryPath string) (int, error) {
 		return 0, fmt.Errorf("reading legacy registry: %w", err)
 	}
 
+	// Try wrapped format {"agents": [...]} first, then bare array.
+	var file legacyRegistryFile
 	var entries []legacyRegistryEntry
-	if err := json.Unmarshal(data, &entries); err != nil {
+	if err := json.Unmarshal(data, &file); err == nil && len(file.Agents) > 0 {
+		entries = file.Agents
+	} else if err := json.Unmarshal(data, &entries); err != nil {
 		return 0, fmt.Errorf("parsing legacy registry: %w", err)
 	}
 

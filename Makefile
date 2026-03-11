@@ -3,7 +3,7 @@ VERSION ?= dev
 BUILD_DIR := bin
 LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 
-.PHONY: build test test-integration e2e e2e-deploy lint build-all checksums clean
+.PHONY: build test test-integration e2e e2e-deploy lint build-all build-proxy build-all-proxy docker-proxy checksums clean
 
 build:  ## Build binary for current platform
 	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/volra
@@ -35,6 +35,16 @@ checksums:  ## Generate SHA256 checksums
 	  else \
 	    shasum -a 256 $(BINARY_NAME)-* > SHA256SUMS; \
 	  fi
+
+build-proxy:  ## Build proxy binary for current platform
+	go build -o $(BUILD_DIR)/volra-proxy ./cmd/volra-proxy
+
+build-all-proxy:  ## Cross-compile proxy for all targets
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/volra-proxy-linux-amd64 ./cmd/volra-proxy
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o $(BUILD_DIR)/volra-proxy-linux-arm64 ./cmd/volra-proxy
+
+docker-proxy:  ## Build proxy Docker image
+	docker build -f Dockerfile.proxy -t volra-proxy:dev .
 
 clean:  ## Remove build artifacts
 	rm -rf $(BUILD_DIR)

@@ -209,6 +209,44 @@ func TestGenerateCard_Description(t *testing.T) {
 	assert.Contains(t, card.Description, "self-hosted")
 }
 
+func TestGenerateCard_WithA2ASkills(t *testing.T) {
+	af := &agentfile.Agentfile{
+		Name:      "my-agent",
+		Framework: agentfile.FrameworkGeneric,
+		A2A: &agentfile.A2AConfig{
+			Mode: agentfile.A2AModeDeclarative,
+			Skills: []agentfile.A2ASkill{
+				{ID: "research", Name: "research", Description: "Research capability"},
+				{ID: "search", Name: "semantic-search", Description: "Search docs"},
+			},
+		},
+	}
+
+	card := GenerateCard(af, "http://localhost:8000")
+
+	// 1 primary + 2 declarative = 3
+	require.Len(t, card.Skills, 3)
+	assert.Equal(t, "my-agent-primary", card.Skills[0].ID)
+	assert.Equal(t, "my-agent-research", card.Skills[1].ID)
+	assert.Equal(t, "Research capability", card.Skills[1].Description)
+	assert.Contains(t, card.Skills[1].Tags, "a2a")
+	assert.Equal(t, "my-agent-search", card.Skills[2].ID)
+}
+
+func TestGenerateCard_WithA2ASkills_NotDeclarative(t *testing.T) {
+	af := &agentfile.Agentfile{
+		Name:      "my-agent",
+		Framework: agentfile.FrameworkGeneric,
+		A2A: &agentfile.A2AConfig{
+			Mode: agentfile.A2AModeDefault,
+		},
+	}
+
+	card := GenerateCard(af, "http://localhost:8000")
+	// Only primary skill, no declarative skills added.
+	require.Len(t, card.Skills, 1)
+}
+
 func TestNginxLocationBlock(t *testing.T) {
 	block := NginxLocationBlock()
 	assert.Contains(t, block, "/.well-known/agent-card.json")

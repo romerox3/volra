@@ -54,6 +54,9 @@ func Validate(af *Agentfile) error {
 	if err := validateEval(af.Eval); err != nil {
 		return err
 	}
+	if err := validateA2A(af.A2A); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -468,6 +471,85 @@ func validateEval(eval *EvalConfig) error {
 			}
 		}
 		seen[m.Name] = true
+	}
+	return nil
+}
+
+func validateA2A(cfg *A2AConfig) error {
+	if cfg == nil {
+		return nil
+	}
+	// Validate mode
+	switch cfg.Mode {
+	case "", A2AModeDefault, A2AModeDeclarative, A2AModePassthrough:
+		// ok
+	default:
+		return &output.UserError{
+			Code: output.CodeInvalidAgentfile,
+			What: fmt.Sprintf("Invalid field: a2a.mode — %q is not valid (default, declarative, passthrough)", cfg.Mode),
+			Fix:  "Set a2a.mode to default, declarative, or passthrough",
+		}
+	}
+	// Skills only valid with declarative mode
+	if len(cfg.Skills) > 0 && cfg.Mode != A2AModeDeclarative {
+		return &output.UserError{
+			Code: output.CodeInvalidAgentfile,
+			What: "Invalid field: a2a.skills — only valid with mode: declarative",
+			Fix:  "Set a2a.mode to declarative when defining skills",
+		}
+	}
+	if cfg.Mode == A2AModeDeclarative && len(cfg.Skills) == 0 {
+		return &output.UserError{
+			Code: output.CodeInvalidAgentfile,
+			What: "Invalid field: a2a — declarative mode requires at least one skill",
+			Fix:  "Add skills to the a2a section or use mode: default",
+		}
+	}
+	if len(cfg.Skills) > 20 {
+		return &output.UserError{
+			Code: output.CodeInvalidAgentfile,
+			What: "Invalid field: a2a.skills — too many skills (max 20)",
+			Fix:  "Reduce the number of A2A skills to 20 or fewer",
+		}
+	}
+	seen := make(map[string]bool)
+	for i, s := range cfg.Skills {
+		if s.ID == "" {
+			return &output.UserError{
+				Code: output.CodeInvalidAgentfile,
+				What: fmt.Sprintf("Invalid field: a2a.skills[%d].id — required", i),
+				Fix:  "Add an id to each A2A skill",
+			}
+		}
+		if s.Name == "" {
+			return &output.UserError{
+				Code: output.CodeInvalidAgentfile,
+				What: fmt.Sprintf("Invalid field: a2a.skills[%d].name — required", i),
+				Fix:  "Add a name to each A2A skill",
+			}
+		}
+		if s.Endpoint == "" {
+			return &output.UserError{
+				Code: output.CodeInvalidAgentfile,
+				What: fmt.Sprintf("Invalid field: a2a.skills[%d].endpoint — required", i),
+				Fix:  "Add an endpoint to each A2A skill",
+			}
+		}
+		if !strings.HasPrefix(s.Endpoint, "/") {
+			return &output.UserError{
+				Code: output.CodeInvalidAgentfile,
+				What: fmt.Sprintf("Invalid field: a2a.skills[%d].endpoint — %q must start with /", i, s.Endpoint),
+				Fix:  "Prefix the endpoint with /",
+			}
+		}
+		if seen[s.ID] {
+			return &output.UserError{
+				Code: output.CodeInvalidAgentfile,
+				What: fmt.Sprintf("Invalid field: a2a.skills — duplicate skill ID %q", s.ID),
+				Fix:  "Use unique IDs for each A2A skill",
+			}
+		}
+		seen[s.ID] = true
 	}
 	return nil
 }

@@ -169,13 +169,19 @@ services:
       - volra
 
   a2a-proxy:
-    image: nginx:alpine
+    image: ghcr.io/romerox3/volra-proxy:{{.ProxyVersion}}
     container_name: {{.Name}}-a2a-proxy
     restart: unless-stopped
     ports:
       - "{{.AgentHostPort}}:80"
+    environment:
+      - VOLRA_AGENT_URL=http://agent:{{.Port}}
+      - VOLRA_CARD_PATH=/etc/volra/agent-card.json
+      - VOLRA_A2A_MODE={{.A2AMode}}
+{{- if .A2ASkillsJSON}}
+      - VOLRA_A2A_SKILLS={{.A2ASkillsJSON}}
+{{- end}}
     volumes:
-      - ./a2a-proxy.conf:/etc/nginx/conf.d/default.conf:ro
       - ./agent-card.json:/etc/volra/agent-card.json:ro
     depends_on:
       - agent

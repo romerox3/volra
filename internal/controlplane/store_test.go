@@ -131,6 +131,30 @@ func TestImportFromLegacyRegistry(t *testing.T) {
 	assert.Equal(t, 0, n2)
 }
 
+func TestImportFromLegacyRegistry_WrappedFormat(t *testing.T) {
+	s := newTestStore(t)
+
+	// Create legacy registry in {"agents": [...]} format with project_dir field.
+	wrapped := legacyRegistryFile{
+		Agents: []legacyRegistryEntry{
+			{Name: "cortex-agent", Dir: "/opt/cortex", PrometheusPort: 9090, AgentPort: 8000},
+		},
+	}
+	data, _ := json.Marshal(wrapped)
+	registryPath := filepath.Join(t.TempDir(), "agents.json")
+	require.NoError(t, os.WriteFile(registryPath, data, 0o644))
+
+	n, err := s.ImportFromLegacyRegistry(registryPath)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+
+	agents, err := s.ListAgents()
+	require.NoError(t, err)
+	assert.Len(t, agents, 1)
+	assert.Equal(t, "cortex-agent", agents[0].Name)
+	assert.Equal(t, "/opt/cortex", agents[0].Dir)
+}
+
 func TestImportFromLegacyRegistry_NoFile(t *testing.T) {
 	s := newTestStore(t)
 

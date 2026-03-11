@@ -84,6 +84,20 @@ func GenerateCard(af *agentfile.Agentfile, agentURL string) *AgentCard {
 		})
 	}
 
+	// Add declarative skills from Agentfile a2a section.
+	if af.A2A != nil && af.A2A.Mode == agentfile.A2AModeDeclarative {
+		for _, s := range af.A2A.Skills {
+			skills = append(skills, Skill{
+				ID:          af.Name + "-" + s.ID,
+				Name:        s.Name,
+				Description: s.Description,
+				Tags:        []string{"a2a", "volra"},
+				InputModes:  []string{"text"},
+				OutputModes: []string{"text"},
+			})
+		}
+	}
+
 	card := &AgentCard{
 		Name:               af.Name,
 		Description:        fmt.Sprintf("AI agent (%s) self-hosted via Volra", af.Framework),

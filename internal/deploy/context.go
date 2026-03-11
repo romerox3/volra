@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"sort"
@@ -50,6 +51,10 @@ type TemplateContext struct {
 	ObservabilityMetricsPort int
 	HasLevel2                bool
 	AlertmanagerHostPort     int
+	// A2A proxy fields
+	ProxyVersion   string
+	A2AMode        string
+	A2ASkillsJSON  string
 }
 
 // JobHealth returns the Prometheus job name for health endpoint scraping.
@@ -99,6 +104,18 @@ func BuildContext(af *agentfile.Agentfile, dir string) *TemplateContext {
 	}
 	_, err := os.Stat(filepath.Join(dir, "requirements.txt"))
 	tc.HasRequirements = err == nil
+
+	// A2A proxy config
+	tc.ProxyVersion = "1.1.0"
+	if af.A2A != nil && af.A2A.Mode != "" {
+		tc.A2AMode = string(af.A2A.Mode)
+	} else {
+		tc.A2AMode = "default"
+	}
+	if af.A2A != nil && len(af.A2A.Skills) > 0 {
+		b, _ := json.Marshal(af.A2A.Skills)
+		tc.A2ASkillsJSON = string(b)
+	}
 
 	// Filter cache_dirs: exclude package manager caches (handled by --mount=type=cache)
 	if af.Build != nil {

@@ -26,6 +26,8 @@ func minimalTC(name string, port int) *TemplateContext {
 		AgentHostPort:      port,
 		PrometheusHostPort: 9090,
 		GrafanaHostPort:    3001,
+		ProxyVersion:       "1.1.0",
+		A2AMode:            "default",
 	}
 }
 

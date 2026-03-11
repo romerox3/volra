@@ -137,3 +137,10 @@ const (
 	CodeMeshAllUnreachable   = "E2003"
 	CodeMeshFederationDown   = "E2004"
 )
+
+// Error codes for proxy sidecar (E21xx).
+const (
+	CodeProxyAgentUnreachable = "E2101"
+	CodeProxySkillNotFound    = "E2102"
+	CodeProxyInvalidResponse  = "E2103"
+)

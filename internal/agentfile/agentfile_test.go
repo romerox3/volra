@@ -956,3 +956,160 @@ func TestValidate_ObservabilityLevel2GenericFramework(t *testing.T) {
 	err := agentfile.Validate(af)
 	require.NoError(t, err)
 }
+
+// --- A2A config tests ---
+
+func TestValidate_A2ANil(t *testing.T) {
+	af := validAgentfile()
+	af.A2A = nil
+	assert.NoError(t, agentfile.Validate(af))
+}
+
+func TestValidate_A2ADefaultMode(t *testing.T) {
+	af := validAgentfile()
+	af.A2A = &agentfile.A2AConfig{Mode: agentfile.A2AModeDefault}
+	assert.NoError(t, agentfile.Validate(af))
+}
+
+func TestValidate_A2APassthroughMode(t *testing.T) {
+	af := validAgentfile()
+	af.A2A = &agentfile.A2AConfig{Mode: agentfile.A2AModePassthrough}
+	assert.NoError(t, agentfile.Validate(af))
+}
+
+func TestValidate_A2ADeclarativeValid(t *testing.T) {
+	af := validAgentfile()
+	af.A2A = &agentfile.A2AConfig{
+		Mode: agentfile.A2AModeDeclarative,
+		Skills: []agentfile.A2ASkill{
+			{ID: "research", Name: "research", Endpoint: "/ask"},
+			{ID: "search", Name: "search", Endpoint: "/search"},
+		},
+	}
+	assert.NoError(t, agentfile.Validate(af))
+}
+
+func TestValidate_A2AInvalidMode(t *testing.T) {
+	af := validAgentfile()
+	af.A2A = &agentfile.A2AConfig{Mode: "invalid"}
+	err := agentfile.Validate(af)
+	requireUserError(t, err, output.CodeInvalidAgentfile, "a2a.mode")
+}
+
+func TestValidate_A2ASkillsWithoutDeclarative(t *testing.T) {
+	af := validAgentfile()
+	af.A2A = &agentfile.A2AConfig{
+		Mode:   agentfile.A2AModeDefault,
+		Skills: []agentfile.A2ASkill{{ID: "x", Name: "x", Endpoint: "/x"}},
+	}
+	err := agentfile.Validate(af)
+	requireUserError(t, err, output.CodeInvalidAgentfile, "only valid with mode: declarative")
+}
+
+func TestValidate_A2ADeclarativeNoSkills(t *testing.T) {
+	af := validAgentfile()
+	af.A2A = &agentfile.A2AConfig{Mode: agentfile.A2AModeDeclarative}
+	err := agentfile.Validate(af)
+	requireUserError(t, err, output.CodeInvalidAgentfile, "at least one skill")
+}
+
+func TestValidate_A2ASkillMissingID(t *testing.T) {
+	af := validAgentfile()
+	af.A2A = &agentfile.A2AConfig{
+		Mode:   agentfile.A2AModeDeclarative,
+		Skills: []agentfile.A2ASkill{{Name: "x", Endpoint: "/x"}},
+	}
+	err := agentfile.Validate(af)
+	requireUserError(t, err, output.CodeInvalidAgentfile, "id")
+}
+
+func TestValidate_A2ASkillMissingName(t *testing.T) {
+	af := validAgentfile()
+	af.A2A = &agentfile.A2AConfig{
+		Mode:   agentfile.A2AModeDeclarative,
+		Skills: []agentfile.A2ASkill{{ID: "x", Endpoint: "/x"}},
+	}
+	err := agentfile.Validate(af)
+	requireUserError(t, err, output.CodeInvalidAgentfile, "name")
+}
+
+func TestValidate_A2ASkillMissingEndpoint(t *testing.T) {
+	af := validAgentfile()
+	af.A2A = &agentfile.A2AConfig{
+		Mode:   agentfile.A2AModeDeclarative,
+		Skills: []agentfile.A2ASkill{{ID: "x", Name: "x"}},
+	}
+	err := agentfile.Validate(af)
+	requireUserError(t, err, output.CodeInvalidAgentfile, "endpoint")
+}
+
+func TestValidate_A2ASkillEndpointNoSlash(t *testing.T) {
+	af := validAgentfile()
+	af.A2A = &agentfile.A2AConfig{
+		Mode:   agentfile.A2AModeDeclarative,
+		Skills: []agentfile.A2ASkill{{ID: "x", Name: "x", Endpoint: "ask"}},
+	}
+	err := agentfile.Validate(af)
+	requireUserError(t, err, output.CodeInvalidAgentfile, "must start with /")
+}
+
+func TestValidate_A2ASkillDuplicateID(t *testing.T) {
+	af := validAgentfile()
+	af.A2A = &agentfile.A2AConfig{
+		Mode: agentfile.A2AModeDeclarative,
+		Skills: []agentfile.A2ASkill{
+			{ID: "x", Name: "x", Endpoint: "/x"},
+			{ID: "x", Name: "y", Endpoint: "/y"},
+		},
+	}
+	err := agentfile.Validate(af)
+	requireUserError(t, err, output.CodeInvalidAgentfile, "duplicate")
+}
+
+func TestValidate_A2ATooManySkills(t *testing.T) {
+	af := validAgentfile()
+	skills := make([]agentfile.A2ASkill, 21)
+	for i := range skills {
+		skills[i] = agentfile.A2ASkill{
+			ID: fmt.Sprintf("s%d", i), Name: fmt.Sprintf("s%d", i), Endpoint: fmt.Sprintf("/s%d", i),
+		}
+	}
+	af.A2A = &agentfile.A2AConfig{Mode: agentfile.A2AModeDeclarative, Skills: skills}
+	err := agentfile.Validate(af)
+	requireUserError(t, err, output.CodeInvalidAgentfile, "too many")
+}
+
+func TestParse_A2AConfig(t *testing.T) {
+	yaml := `version: 1
+name: my-agent
+framework: generic
+port: 8000
+health_path: /health
+dockerfile: auto
+a2a:
+  mode: declarative
+  skills:
+    - id: research
+      name: research
+      endpoint: /ask
+    - id: search
+      name: semantic-search
+      endpoint: /search
+      request_field: query
+      response_field: documents
+`
+	af, err := agentfile.Parse(strings.NewReader(yaml))
+	require.NoError(t, err)
+	require.NotNil(t, af.A2A)
+	assert.Equal(t, agentfile.A2AModeDeclarative, af.A2A.Mode)
+	require.Len(t, af.A2A.Skills, 2)
+	assert.Equal(t, "research", af.A2A.Skills[0].ID)
+	assert.Equal(t, "query", af.A2A.Skills[1].RequestField)
+	assert.Equal(t, "documents", af.A2A.Skills[1].ResponseField)
+}
+
+func TestLoad_BackwardCompatNoA2A(t *testing.T) {
+	af, err := agentfile.Load(fixturePath("valid_minimal.yaml"))
+	require.NoError(t, err)
+	assert.Nil(t, af.A2A)
+}
