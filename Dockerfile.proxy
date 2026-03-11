@@ -6,6 +6,6 @@ COPY . .
 RUN CGO_ENABLED=0 go build -o /volra-proxy ./cmd/volra-proxy
 
 FROM alpine:3.21
-COPY --from=builder /volra-proxy /usr/local/bin/volra-proxy
+COPY --from=builder /volra-proxy /volra-proxy
 EXPOSE 80
 ENTRYPOINT ["/volra-proxy"]
