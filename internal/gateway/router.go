@@ -18,8 +18,9 @@ type Backend interface {
 
 // Router dispatches namespaced tool calls to the correct agent backend.
 type Router struct {
-	catalog *Catalog
-	backend Backend
+	catalog    *Catalog
+	backend    Backend
+	a2aBackend *A2ABackend
 
 	mu       sync.RWMutex
 	agentDir map[string]string // agent name -> project dir
@@ -29,16 +30,17 @@ type Router struct {
 // agentDirs maps agent names to their project directories.
 func NewRouter(catalog *Catalog, backend Backend, agentDirs map[string]string) *Router {
 	return &Router{
-		catalog:  catalog,
-		backend:  backend,
-		agentDir: agentDirs,
+		catalog:    catalog,
+		backend:    backend,
+		a2aBackend: NewA2ABackend(),
+		agentDir:   agentDirs,
 	}
 }
 
-// Dispatch handles a namespaced tool call (e.g. "agent-a/volra_deploy").
-// It resolves the agent, strips the namespace prefix, and forwards to the backend.
+// Dispatch handles a namespaced tool call (e.g. "agent-a/volra_deploy" or "staging/agent-a/summarize").
+// For local tools it forwards to the subprocess backend; for remote tools it uses A2A.
 func (r *Router) Dispatch(ctx context.Context, namespacedName string, arguments json.RawMessage) (*mcp.ToolCallResult, error) {
-	// 1. Lookup in catalog (read lock protects catalog pointer during reload).
+	// 1. Lookup in catalog.
 	r.mu.RLock()
 	nt, ok := r.catalog.Lookup(namespacedName)
 	r.mu.RUnlock()
@@ -46,7 +48,12 @@ func (r *Router) Dispatch(ctx context.Context, namespacedName string, arguments 
 		return mcp.ErrorResult(fmt.Sprintf("Unknown tool: %s", namespacedName)), nil
 	}
 
-	// 2. Resolve agent directory.
+	// 2. Remote tools: dispatch via A2A.
+	if nt.Remote && r.a2aBackend != nil {
+		return r.a2aBackend.CallRemote(ctx, nt.AgentURL, nt.OriginalName, arguments)
+	}
+
+	// 3. Local tools: resolve agent directory and forward to subprocess backend.
 	r.mu.RLock()
 	dir, ok := r.agentDir[nt.AgentName]
 	r.mu.RUnlock()
@@ -54,7 +61,6 @@ func (r *Router) Dispatch(ctx context.Context, namespacedName string, arguments 
 		return mcp.ErrorResult(fmt.Sprintf("Agent %q not registered", nt.AgentName)), nil
 	}
 
-	// 3. Forward with original (un-namespaced) tool name.
 	params := mcp.ToolCallParams{
 		Name:      nt.OriginalName,
 		Arguments: arguments,

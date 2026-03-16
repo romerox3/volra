@@ -171,7 +171,8 @@ func TestFetchCapabilities_LocalOnly(t *testing.T) {
 
 func TestFetchCapabilities_LocalCardError(t *testing.T) {
 	client := NewFederationClient()
-	local := []Agent{{Name: "test-agent", Port: 8000, CreatedAt: time.Now().UTC()}}
+	// Use an ephemeral port where nothing listens to guarantee card_error.
+	local := []Agent{{Name: "test-agent", Port: 59124, CreatedAt: time.Now().UTC()}}
 
 	// No card server running → card_error.
 	caps := client.FetchCapabilities(context.Background(), local, nil, "")

@@ -152,7 +152,10 @@ func (s *Server) handleToolsCall(ctx context.Context, req mcp.Request, session *
 	}
 
 	// Record session-agent interaction for affinity tracking.
-	if agentName, _, ok := ParseNamespace(params.Name); ok {
+	// For three-tier names (server/agent/tool), extract the agent component.
+	if nt, ok := s.router.catalog.Lookup(params.Name); ok {
+		s.sessions.RecordInteraction(session.ID, nt.AgentName)
+	} else if agentName, _, ok := ParseNamespace(params.Name); ok {
 		s.sessions.RecordInteraction(session.ID, agentName)
 	}
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/romerox3/volra/internal/mcp"
@@ -172,4 +174,77 @@ func TestIsRemoteNamespace(t *testing.T) {
 	assert.True(t, IsRemoteNamespace("staging/agent/tool"))
 	assert.False(t, IsRemoteNamespace("agent/tool"))
 	assert.False(t, IsRemoteNamespace("tool"))
+}
+
+func TestRouter_Dispatch_RemoteTool(t *testing.T) {
+	// Start a fake A2A server.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/a2a", r.URL.Path)
+		resp := a2aResponse{
+			JSONRPC: "2.0",
+			ID:      "1",
+			Result: &a2aTaskResult{
+				ID:     "task-1",
+				Status: a2aTaskStatus{State: "completed"},
+				Artifacts: []a2aArtifact{
+					{Parts: []a2aPart{{Type: "text", Text: "remote result"}}},
+				},
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	cat := &Catalog{
+		tools: []NamespacedTool{
+			{AgentName: "agent-a", OriginalName: "volra_deploy", Tool: mcp.Tool{Name: "agent-a/volra_deploy"}},
+			{
+				AgentName:    "analyst",
+				OriginalName: "summarize",
+				Tool:         mcp.Tool{Name: "staging/analyst/summarize"},
+				Server:       "staging",
+				AgentURL:     srv.URL,
+				Remote:       true,
+			},
+		},
+	}
+	backend := &mockBackend{}
+	dirs := map[string]string{"agent-a": "/tmp/agent-a"}
+	router := NewRouter(cat, backend, dirs)
+
+	// Remote tool should use A2A backend.
+	result, err := router.Dispatch(context.Background(), "staging/analyst/summarize", json.RawMessage(`{"text":"hello"}`))
+	require.NoError(t, err)
+	assert.False(t, result.IsError)
+	assert.Equal(t, "remote result", result.Content[0].Text)
+	// Subprocess backend should NOT have been called.
+	assert.Empty(t, backend.lastDir)
+
+	// Local tool should still use subprocess backend.
+	result, err = router.Dispatch(context.Background(), "agent-a/volra_deploy", nil)
+	require.NoError(t, err)
+	assert.False(t, result.IsError)
+	assert.Equal(t, "/tmp/agent-a", backend.lastDir)
+}
+
+func TestRouter_Dispatch_RemoteToolUnreachable(t *testing.T) {
+	cat := &Catalog{
+		tools: []NamespacedTool{
+			{
+				AgentName:    "analyst",
+				OriginalName: "summarize",
+				Tool:         mcp.Tool{Name: "staging/analyst/summarize"},
+				Server:       "staging",
+				AgentURL:     "http://192.0.2.1:9999", // unreachable
+				Remote:       true,
+			},
+		},
+	}
+	router := NewRouter(cat, &mockBackend{}, nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately to trigger fast failure
+
+	_, err := router.Dispatch(ctx, "staging/analyst/summarize", nil)
+	require.Error(t, err)
 }

@@ -184,17 +184,17 @@ func TestHandleFederationCapabilities_WithLocalAgents(t *testing.T) {
 	defer cardSrv.Close()
 
 	// We need to get the port from the card server to set as agent port.
+	// Use a port guaranteed to have nothing listening (ephemeral range, unlikely conflict).
 	require.NoError(t, store.UpsertAgent(Agent{
 		Name:      "local-agent",
 		Dir:       "/tmp/a",
 		Status:    "healthy",
-		Port:      8000,
+		Port:      59123,
 		CreatedAt: time.Now().UTC(),
 	}))
 
-	// Override federation client to use our test URL.
-	// We can't easily test the full flow since FetchCapabilities uses the agent port
-	// to build URLs. Instead, test the endpoint returns proper JSON structure.
+	// The federation endpoint fetches agent cards via HTTP.
+	// Since nothing listens on port 59123, the card fetch fails → card_error.
 	req := httptest.NewRequest("GET", "/api/federation/capabilities", nil)
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, req)
@@ -203,8 +203,6 @@ func TestHandleFederationCapabilities_WithLocalAgents(t *testing.T) {
 
 	var caps []FederatedCapability
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &caps))
-	// Local agent card fetch will fail (no server at localhost:8000 in test),
-	// but it should still return with card_error status.
 	require.Len(t, caps, 1)
 	assert.Equal(t, "local-agent", caps[0].Agent)
 	assert.Equal(t, "local", caps[0].Server)

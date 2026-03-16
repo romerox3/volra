@@ -23,7 +23,7 @@
 ```
 $ volra deploy
 
-  Volra Deploy v1.1.0
+  Volra Deploy v1.2.0
 
   Generating artifacts...
     ✓ Dockerfile                → .volra/Dockerfile
@@ -249,7 +249,8 @@ All commands support `--json` for CI/CD integration.
 | v0.6 | MCP Gateway, OTel auto-instrumentation, Langfuse, A2A cards | Released |
 | v0.7 | Governance: Alertmanager, marketplace, audit, compliance | Released |
 | v1.0 | Production Platform: control plane, console, K8s, RBAC, federation | Released |
-| v1.1 | Agent Mesh: A2A v0.3, federated discovery, cross-server routing | **Current** |
+| v1.1 | Agent Mesh: A2A v0.3, federated discovery, cross-server routing | Released |
+| v1.2 | Smart Sidecar: Go A2A proxy, task execution, gateway A2A routing | **Current** |
 
 ## Requirements
 
@@ -280,4 +281,4 @@ make e2e-deploy    # E2E Phase 3+4 (Docker required)
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © 2026 [Antonio Romero](https://github.com/romerox3)
